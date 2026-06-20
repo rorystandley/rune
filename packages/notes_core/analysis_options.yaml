@@ -1,0 +1,13 @@
+include: package:lints/recommended.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-raw-types: true
+
+linter:
+  rules:
+    - prefer_final_locals
+    - prefer_single_quotes
+    # Reinforces the "no logging of secrets" stance: the core must not print.
+    - avoid_print

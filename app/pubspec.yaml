@@ -1,0 +1,81 @@
+name: notes_app
+description: "Private, local-first, encrypted notes. No telemetry, no network by default."
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  # The pure-Dart vault engine (crypto, storage, services). No Flutter, no network.
+  notes_core:
+    path: ../packages/notes_core
+  # Resolves the per-platform application-support directory for the vault.
+  path_provider: ^2.1.0
+  # Local microphone capture for voice notes. No network.
+  # 7.x aligns all platform packages on record_platform_interface 2.x; older
+  # 5.x resolves a stale record_linux that fails to compile on desktop builds.
+  record: ^7.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  # Drives the app on real devices/simulators to capture store screenshots
+  # (see integration_test/ and tool/screenshots/). Test-only; not shipped.
+  integration_test:
+    sdk: flutter
+  # Build-time generators for app icons and the native launch screen. They read
+  # the source artwork in assets/branding/ and write into the native platform
+  # folders; they are not shipped in the app and add no runtime dependencies.
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
+
+flutter:
+  uses-material-design: true
+
+# App launcher icons. Source artwork lives in assets/branding/.
+# Regenerate after editing the source: `dart run flutter_launcher_icons`.
+flutter_launcher_icons:
+  image_path: "assets/branding/icon_master.png"
+  # iOS icons must be fully opaque; flatten the (already-opaque) alpha channel.
+  ios: true
+  remove_alpha_ios: true
+  # iOS 18 dark-mode app icon: transparent artwork; iOS supplies the dark backdrop.
+  image_path_ios_dark_transparent: "assets/branding/icon_dark_transparent.png"
+  # Android uses adaptive icons: a solid amber background layer plus the
+  # note+lock foreground, kept inside the system mask's safe zone.
+  android: true
+  adaptive_icon_background: "#E8B520"
+  adaptive_icon_foreground: "assets/branding/icon_foreground.png"
+  # Android 13+ themed ("monochrome") icon: a single-tint silhouette the system
+  # recolors to match the user's wallpaper/theme. Android's nearest dark-mode equivalent.
+  adaptive_icon_monochrome: "assets/branding/icon_monochrome.png"
+  macos:
+    generate: true
+    image_path: "assets/branding/icon_master.png"
+  windows:
+    generate: true
+    image_path: "assets/branding/icon_master.png"
+    icon_size: 256
+
+# Native launch screen shown while the app boots.
+# Regenerate after editing: `dart run flutter_native_splash:create`.
+flutter_native_splash:
+  color: "#E8B520"
+  image: "assets/branding/splash_logo.png"
+  # Dark-mode launch screen: near-black background (matches the app's dark theme),
+  # same white note+lock logo.
+  color_dark: "#1B1B1D"
+  image_dark: "assets/branding/splash_logo.png"
+  android: true
+  ios: true
+  web: false
+  android_12:
+    image: "assets/branding/splash_logo.png"
+    color: "#E8B520"
+    image_dark: "assets/branding/splash_logo.png"
+    color_dark: "#1B1B1D"

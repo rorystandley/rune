@@ -1,0 +1,154 @@
+name: release
+
+# Builds every platform on a version tag and publishes a (draft) GitHub Release
+# with checksums. Signing/notarization need repo secrets and are marked below;
+# without them you still get installable test artifacts (Android falls back to
+# debug signing; macOS is ad-hoc signed; iOS is an unsigned compile check).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.44.2"
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: android }
+          - { os: ubuntu-latest, target: linux }
+          - { os: macos-latest, target: macos }
+          - { os: macos-latest, target: ios }
+          - { os: windows-latest, target: windows }
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java (Android)
+        if: matrix.target == 'android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Linux build deps
+        if: matrix.target == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+
+      # Optional release signing for Android. Add these repo secrets to sign for
+      # Google Play; otherwise the build uses debug signing (test artifact only).
+      - name: Android signing
+        if: matrix.target == 'android'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            KS="$RUNNER_TEMP/upload-keystore.jks"
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KS"
+            cat > android/key.properties <<EOF
+          storeFile=$KS
+          storePassword=$ANDROID_STORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          EOF
+            echo "release signing configured"
+          else
+            echo "no keystore secret; using debug signing (test artifact only)"
+          fi
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Android
+        if: matrix.target == 'android'
+        run: |
+          flutter build apk --release
+          flutter build appbundle --release
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk dist/notes-app-android.apk
+          cp build/app/outputs/bundle/release/app-release.aab dist/notes-app-android.aab
+
+      - name: Build Linux
+        if: matrix.target == 'linux'
+        run: |
+          flutter build linux --release
+          mkdir -p dist
+          tar -czf dist/notes-app-linux-x64.tar.gz -C build/linux/x64/release/bundle .
+
+      - name: Build macOS
+        if: matrix.target == 'macos'
+        # For distribution outside your own Mac, add a Developer ID signing +
+        # notarization step here (you have the cert); ad-hoc is fine for testing.
+        run: |
+          flutter build macos --release
+          mkdir -p dist
+          ditto -c -k --sequesterRsrc --keepParent \
+            "build/macos/Build/Products/Release/Notes App.app" \
+            "dist/notes-app-macos.zip"
+
+      - name: Build iOS (unsigned compile check)
+        if: matrix.target == 'ios'
+        # A signed, uploadable IPA needs certs/profiles (e.g. fastlane match) via
+        # secrets; this job just proves the iOS build compiles.
+        run: flutter build ios --release --no-codesign
+
+      - name: Build Windows
+        if: matrix.target == 'windows'
+        shell: bash
+        run: |
+          flutter build windows --release
+          mkdir -p dist
+          7z a -tzip dist/notes-app-windows-x64.zip ./build/windows/x64/runner/Release/*
+
+      - name: Upload artifacts
+        if: matrix.target != 'ios'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: app/dist/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+      - name: Publish draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            dist/*
