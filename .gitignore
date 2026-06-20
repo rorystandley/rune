@@ -1,0 +1,32 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+# Commit the app's lockfile for reproducible builds; the library omits its own.
+pubspec.lock
+!app/pubspec.lock
+*.iml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Local config / secrets — never commit a real vault
+*.notesbak
+vault/
+audio_tmp/
+
+# Signing material — never commit
+**/key.properties
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.mobileprovision
+**/*.cer
+
+# Raw store-screenshot captures (regenerate with app/tool/screenshots/*.sh)
+**/screenshots/

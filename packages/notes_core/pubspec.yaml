@@ -1,0 +1,16 @@
+name: notes_core
+description: >-
+  Pure-Dart core for a local-first, encrypted notes vault. Argon2id +
+  XChaCha20-Poly1305. No Flutter, no network, no telemetry.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  cryptography: ^2.7.0
+
+dev_dependencies:
+  lints: ^5.0.0
+  test: ^1.25.0
