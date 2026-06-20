@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Native splash logo: rune at 0.50, centered; shown on amber (light) / near-black (dark). -->
+  <path d="M512 648 V376 M512 473 L420 376 M512 473 L604 376" fill="none" stroke="#FFFFFF" stroke-width="35" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
