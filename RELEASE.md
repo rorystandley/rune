@@ -40,7 +40,7 @@ must increase for every store upload. Consider obfuscating release binaries:
 Requires the Apple Developer Program ($99/yr).
 
 1. In Xcode (`open ios/Runner.xcworkspace`): set the team, confirm
-   `co.rorystandley.notesApp`, and create the App ID + app record in
+   `co.rorystandley.rune`, and create the App ID + app record in
    App Store Connect.
 2. Confirm voice notes prompt for mic access (the `NSMicrophoneUsageDescription`
    is set) and that `ITSAppUsesNonExemptEncryption` is correct for you.
@@ -81,7 +81,7 @@ Requires a Play Console account ($25 once).
 
 - `flutter build linux` produces `build/linux/x64/release/bundle/`.
 - Package as Flatpak, Snap, or AppImage. Application ID is
-  `co.rorystandley.notes_app`.
+  `co.rorystandley.rune`.
 
 ## Reproducible / verifiable builds (ROADMAP #1)
 
