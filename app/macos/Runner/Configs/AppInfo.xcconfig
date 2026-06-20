@@ -8,7 +8,7 @@
 PRODUCT_NAME = Rune
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = co.rorystandley.notesApp
+PRODUCT_BUNDLE_IDENTIFIER = co.rorystandley.rune
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 co.rorystandley. All rights reserved.
