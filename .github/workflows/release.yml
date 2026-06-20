@@ -107,7 +107,7 @@ jobs:
           flutter build macos --release
           mkdir -p dist
           ditto -c -k --sequesterRsrc --keepParent \
-            "build/macos/Build/Products/Release/Notes App.app" \
+            "build/macos/Build/Products/Release/Rune.app" \
             "dist/notes-app-macos.zip"
 
       - name: Build iOS (unsigned compile check)

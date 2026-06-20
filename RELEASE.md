@@ -1,6 +1,6 @@
 # Release & distribution
 
-How to take Notes App from source to shipped builds. The app is local-first and
+How to take Rune from source to shipped builds. The app is local-first and
 network-free; the privacy story (see [PRIVACY.md](PRIVACY.md) and
 [SECURITY.md](SECURITY.md)) makes the store privacy forms easy — declare that
 nothing is collected or transmitted.
@@ -15,7 +15,7 @@ Done:
   in `app/assets/branding/`; regenerate with `dart run flutter_launcher_icons`
   and `dart run flutter_native_splash:create`.
 - Real bundle identifiers everywhere (`co.rorystandley.*`).
-- User-facing name "Notes App" across iOS, Android, macOS, Windows, Linux.
+- User-facing name "Rune" across iOS, Android, macOS, Windows, Linux.
 - iOS microphone usage string + export-compliance flag (`Info.plist`).
 - Android release-signing plumbing (`build.gradle.kts` reads `key.properties`).
 

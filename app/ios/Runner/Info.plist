@@ -7,7 +7,7 @@
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
-		<string>Notes App</string>
+		<string>Rune</string>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
 		<key>CFBundleName</key>
-		<string>notes_app</string>
+		<string>Rune</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>
@@ -69,7 +69,7 @@
 		<key>UIStatusBarHidden</key>
 		<false/>
 		<key>NSMicrophoneUsageDescription</key>
-		<string>Notes App uses the microphone only to record voice notes. Audio stays on your device and is never uploaded.</string>
+		<string>Rune uses the microphone only to record voice notes. Audio stays on your device and is never uploaded.</string>
 		<!-- The app uses standard encryption (AES / Argon2id) to protect notes on-device,
 		     which qualifies for the U.S. export-compliance exemption. Setting this to false
 		     lets App Store / TestFlight uploads skip the manual encryption question.

@@ -1,4 +1,4 @@
-# Notes — a private, local-first, encrypted notes app
+# Rune — a private, local-first, encrypted notes app
 
 A simple, fast, calm notes app in the spirit of Apple Notes, built for people
 who don't trust apps with their data. Notes never leave your device, are
