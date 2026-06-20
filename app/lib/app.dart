@@ -45,7 +45,7 @@ class _NotesAppState extends State<NotesApp> with WidgetsBindingObserver {
     return AppScope(
       controller: widget.controller,
       child: MaterialApp(
-        title: 'Notes',
+        title: 'Rune',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
