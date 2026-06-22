@@ -38,7 +38,7 @@ class _NarrowHome extends StatelessWidget {
     final controller = AppScope.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notes'),
+        title: const Text('Rune'),
         actions: [
           IconButton(
             icon: const Icon(Icons.mic_none),
@@ -135,7 +135,7 @@ class _SidebarHeader extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              'Notes',
+              'Rune',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.titleLarge,

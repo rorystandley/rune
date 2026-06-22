@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/rorystandley/rune/actions/workflows/ci.yml/badge.svg)](https://github.com/rorystandley/rune/actions/workflows/ci.yml)
 
+<p align="center"><img src="docs/assets/screenshot-home.png" width="300" alt="Rune — encrypted notes list"></p>
+
 A simple, fast, calm notes app in the spirit of Apple Notes, built for people
 who don't trust apps with their data. Notes never leave your device, are
 encrypted at rest with modern authenticated encryption, and the app makes **no
