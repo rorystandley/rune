@@ -179,8 +179,24 @@ target simple.
 
 ---
 
-## Reporting
+## Reporting a vulnerability
 
-This is reference/MVP code. If you find a cryptographic mistake or a place where
-a claim here is not actually true of the code, that is a security bug — fix it
-or open an issue before relying on the app.
+If you find a cryptographic mistake, a place where a claim in this document is
+not actually true of the code, or any other security issue, please report it
+**privately first** — do not open a public issue for an exploitable flaw.
+
+**Preferred channel: GitHub private vulnerability reporting.** Go to the
+[Security tab](https://github.com/rorystandley/rune/security/advisories) and
+click **Report a vulnerability**, or use the **Report a vulnerability** button
+under *Security advisories*. This opens a private advisory visible only to you
+and the maintainer — not the public — so a fix can be prepared before any
+details are disclosed.
+
+<!-- TODO(owner): if you want to offer an email contact in addition to GitHub
+     private reporting, add it here (e.g. a dedicated security@ address). Do not
+     publish a personal address you don't want indexed. -->
+
+Once a fix is available it will be released and the advisory published with
+credit (unless you prefer to remain anonymous). For non-exploitable
+documentation or hardening suggestions, a normal public issue or pull request is
+welcome.
