@@ -205,6 +205,14 @@ the security tests pass publicly on each commit (see the CI badge above).
 Full commitments: [PRIVACY.md](PRIVACY.md). Threat model and limits:
 [SECURITY.md](SECURITY.md).
 
+## Verifying a release
+
+Released builds carry cryptographic provenance you can check against this repo:
+SLSA build-provenance attestations on every artifact, plus a keyless cosign
+signature over `SHA256SUMS`. Copy-paste verification commands (`gh attestation
+verify`, `cosign verify-blob`, `sha256sum -c`) are in
+[RELEASE.md → Verifying a release](RELEASE.md#verifying-a-release).
+
 ## License
 
 Licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE).

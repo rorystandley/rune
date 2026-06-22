@@ -105,6 +105,10 @@ Be clear-eyed about these:
   memory.** Out of scope for the MVP.
 - **Supply-chain trust.** You are trusting Flutter, Dart, the `cryptography`
   package, and the `record` package. Pin and review them for high-assurance use.
+  For the released binaries, each download carries verifiable provenance — SLSA
+  build-provenance attestations and a keyless cosign signature over `SHA256SUMS`
+  — so you can confirm a build came from this repo's CI before trusting it. See
+  [Verifying a release](RELEASE.md#verifying-a-release).
 
 ### What metadata leaks
 
