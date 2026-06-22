@@ -45,12 +45,21 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      # Install Flutter without a third-party action. The repo ruleset requires every
+      # action to be pinned to a full-length commit SHA, and subosito/flutter-action is a
+      # composite action that transitively references an unpinned actions/cache@v5, which
+      # the ruleset blocks. Cloning the SDK at the pinned tag uses no action references and
+      # lets Flutter select the correct host architecture (e.g. arm64 macOS runners).
       - name: Set up Flutter
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: false
+        shell: bash
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_VERSION" \
+            https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Flutter version
+        shell: bash
+        run: flutter --version
 
       - name: Linux build deps
         if: matrix.target == 'linux'
@@ -81,6 +90,7 @@ jobs:
           fi
 
       - name: Get dependencies
+        shell: bash
         run: flutter pub get
 
       - name: Build Android
