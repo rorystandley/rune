@@ -192,10 +192,6 @@ under *Security advisories*. This opens a private advisory visible only to you
 and the maintainer — not the public — so a fix can be prepared before any
 details are disclosed.
 
-<!-- TODO(owner): if you want to offer an email contact in addition to GitHub
-     private reporting, add it here (e.g. a dedicated security@ address). Do not
-     publish a personal address you don't want indexed. -->
-
 Once a fix is available it will be released and the advisory published with
 credit (unless you prefer to remain anonymous). For non-exploitable
 documentation or hardening suggestions, a normal public issue or pull request is
