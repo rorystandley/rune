@@ -1,5 +1,7 @@
 # Rune — a private, local-first, encrypted notes app
 
+[![CI](https://github.com/rorystandley/rune/actions/workflows/ci.yml/badge.svg)](https://github.com/rorystandley/rune/actions/workflows/ci.yml)
+
 A simple, fast, calm notes app in the spirit of Apple Notes, built for people
 who don't trust apps with their data. Notes never leave your device, are
 encrypted at rest with modern authenticated encryption, and the app makes **no
@@ -151,6 +153,11 @@ cd app && flutter test
 What's covered (encryption round-trips, wrong-passphrase rejection, CRUD,
 search, export behaviour, no-plaintext-at-rest, no-secret-logging) is described
 in [TESTING.md](TESTING.md).
+
+These exact checks — `dart analyze` + `dart test` for the core, and `flutter
+analyze` + `flutter test` for the app — run in
+[GitHub Actions](.github/workflows/ci.yml) on every push and pull request, so
+the security tests pass publicly on each commit (see the CI badge above).
 
 ---
 
