@@ -29,12 +29,19 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      # Install Flutter without a third-party action. The repo requires every action to be
+      # pinned to a full-length commit SHA, and subosito/flutter-action is a composite
+      # action that transitively references an unpinned actions/cache@v5, which is blocked
+      # at job setup. Cloning the SDK at the pinned tag uses no action references; the clone
+      # provides both `flutter` and `dart`.
       - name: Set up Flutter
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_VERSION" \
+            https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Flutter version
+        run: flutter --version
 
       # --- packages/notes_core: pure Dart, where the security lives ---
       - name: Core — get dependencies
