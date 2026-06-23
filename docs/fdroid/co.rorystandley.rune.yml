@@ -41,9 +41,9 @@ Builds:
     output: build/app/outputs/flutter-apk/app-release.apk
     build: |
       export SOURCE_DATE_EPOCH=$(git -C "$(git rev-parse --show-toplevel)" log -1 --pretty=%ct)
-      $$flutter$$/bin/flutter config --no-analytics --no-cli-animations
-      $$flutter$$/bin/flutter pub get
-      $$flutter$$/bin/flutter build apk --release
+      export PATH="$$flutter$$/bin:$PATH"
+      flutter config --no-analytics --no-cli-animations
+      ../tool/reproducibility/build_release_apk.sh build/app/outputs/flutter-apk/app-release.apk
     # Gradle 9.1.0 (wrapper), AGP 9.0.1, Kotlin 2.3.20, compileSdk/targetSdk 36,
     # minSdk 24, Java 17 — all pinned in app/android (see RELEASE.md). R8/minify
     # and the Play dependency-metadata blob are off for byte-stable output.
