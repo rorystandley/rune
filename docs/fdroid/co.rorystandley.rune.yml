@@ -27,8 +27,9 @@ Repo: https://github.com/rorystandley/rune.git
 Builds:
   - versionName: 0.1.0
     versionCode: 1
-    # FILL BEFORE SUBMIT: this tag must exist and point at the released source.
-    # Releases are currently DRAFT; cut tag v0.1.0 first.
+    # Tag v0.1.0 exists and points at the released source. NOTE: publish the
+    # v0.1.0 GitHub release (currently a draft) before submitting, so the
+    # Binaries: URL below is publicly downloadable.
     commit: v0.1.0
     subdir: app
     # F-Droid's Flutter srclib, checked out at the exact SDK tag we build with.
@@ -56,12 +57,10 @@ Builds:
 # Reproducible-build verification: compare F-Droid's rebuild against the
 # developer-signed APK published on GitHub Releases.
 Binaries: https://github.com/rorystandley/rune/releases/download/v%v/notes-app-android.apk
-# FILL BEFORE SUBMIT: SHA-256 of the *release* signing certificate (NOT the debug
-# key). Once the upload keystore exists:
-#   apksigner verify --print-certs notes-app-android.apk | grep -i 'SHA-256'
-# or: keytool -list -v -keystore upload.jks -alias <alias>   (use the SHA-256, lowercased, no colons)
+# SHA-256 of the release (upload-key) signing certificate, read from the v0.1.0
+# release APK: `apksigner verify --print-certs notes-app-android.apk`.
 AllowedAPKSigningKeys:
-  - 0000000000000000000000000000000000000000000000000000000000000000
+  - 9713bd2fd4a7a6e677d9638dcebb0a718f434f9c62b954008d8c99fe521378ac
 
 AutoUpdateMode: Version v%v
 UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
