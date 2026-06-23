@@ -22,17 +22,19 @@ Done:
   signature over `SHA256SUMS` on every CI release, with gated Android upload
   signing and macOS Developer ID signing + notarization. See
   [Verifying a release](#verifying-a-release).
-- Reproducible Android builds: pinned toolchain, deterministic build config and
-  packaging, a double-build verification (script + manual CI job), and the
-  F-Droid recipe + Fastlane metadata prepared in-repo. See
+- Android build determinism (toolchain pinned; Play dependency-metadata blob and
+  R8 off; `SOURCE_DATE_EPOCH`; F-Droid recipe + Fastlane metadata in-repo).
+  **Not yet bit-for-bit reproducible** — the two-checkout CI build fails on
+  build-path-dependent Dart AOT libs (`libapp.so`/`libdartjni.so`). See
   [Reproducible / verifiable builds](#reproducible--verifiable-builds-roadmap-1)
   and [docs/reproducibility.md](docs/reproducibility.md).
 
-Before a public 1.0 (from [ROADMAP.md](ROADMAP.md)): independent crypto review,
-F-Droid's own reproducible-build verification of a tagged release (the
-determinism work for #1 is in place; the remaining step is the external rebuild
-match), and supply-chain review / SBOM (#10). Not store blockers, but they back
-up the "honestly private" claim.
+Before a public 1.0 (from [ROADMAP.md](ROADMAP.md)): independent crypto review;
+**bit-for-bit reproducibility for #1** — the determinism config is in place, but
+the Dart AOT libraries are still build-path-dependent (the two-checkout CI build
+fails), which must be fixed before F-Droid can verify a tagged release; and
+supply-chain review / SBOM (#10). Not store blockers, but they back up the
+"honestly private" claim.
 
 ## Pre-flight (every release)
 
@@ -177,7 +179,7 @@ signature over `SHA256SUMS` (see [Verifying a release](#verifying-a-release)),
 plus gated platform code-signing. No maintainer secrets are involved in producing
 the provenance.
 
-### Determinism — **in place for Android**
+### Determinism — **configured, not yet reproducible**
 
 The goal is bit-for-bit reproducibility so an independent rebuild from source
 yields byte-identical artifacts — the prerequisite for F-Droid's
@@ -218,14 +220,14 @@ in two *separate* clean checkouts on Linux and runs the same comparator
 ([`tool/reproducibility/compare_apks.py`](tool/reproducibility/compare_apks.py)),
 uploading both APKs and a diffoscope report.
 
-**Evidence so far:** on a fixed toolchain, two clean builds are byte-for-byte
-identical (same SHA-256, signature included — Flutter 3.44.2 signs v2-only, so
-there are no JAR signature files to differ). That rules out timestamps, entry
-ordering, nondeterministic compression, and the dependency blob. It does **not**
-yet prove an independent rebuild on a *different* machine matches the published
-APK — the two-checkout Linux CI job tests path-independence, and F-Droid's own
-rebuild is the final word. The honest, measured detail and the residual
-nondeterminism (JDK major, host OS) are in
+**Evidence:** two clean builds in the *same* directory are byte-for-byte
+identical (same SHA-256), which rules out timestamps, entry ordering,
+nondeterministic compression, and the dependency blob. But the stronger
+two-checkout CI job — building the same commit at two *different* paths — **fails**
+(run 28015970937, 2026-06-23): the Dart AOT libraries `libapp.so` and
+`libdartjni.so` differ across build paths. So the build is **not yet reproducible**
+across independent checkouts; the residual is build-path dependence in the AOT
+snapshot, which must be fixed before F-Droid can verify it. Full detail in
 [docs/reproducibility.md](docs/reproducibility.md).
 
 ### F-Droid submission
