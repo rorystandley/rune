@@ -1,0 +1,10 @@
+First public build (MVP).
+
+* Encrypted vault: Argon2id + XChaCha20-Poly1305, only ciphertext at rest.
+* Create, edit, search, and delete notes; autosave.
+* Auto-lock on inactivity, lock-on-background, starts locked.
+* Encrypted backup export; plaintext export behind an explicit warning.
+* Local voice-note recording (on-device only).
+* Fully offline: no network, no telemetry, no accounts.
+
+Not yet audited. On-device transcription is still a clearly-labelled stub.

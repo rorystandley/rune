@@ -22,11 +22,17 @@ Done:
   signature over `SHA256SUMS` on every CI release, with gated Android upload
   signing and macOS Developer ID signing + notarization. See
   [Verifying a release](#verifying-a-release).
+- Reproducible Android builds: pinned toolchain, deterministic build config and
+  packaging, a double-build verification (script + manual CI job), and the
+  F-Droid recipe + Fastlane metadata prepared in-repo. See
+  [Reproducible / verifiable builds](#reproducible--verifiable-builds-roadmap-1)
+  and [docs/reproducibility.md](docs/reproducibility.md).
 
-Before a public 1.0 (from [ROADMAP.md](ROADMAP.md)): independent crypto review +
-bit-for-bit reproducible builds (#1, the remaining half of "reproducible/signed")
-and supply-chain review / SBOM (#10). Not store blockers, but they back up the
-"honestly private" claim.
+Before a public 1.0 (from [ROADMAP.md](ROADMAP.md)): independent crypto review,
+F-Droid's own reproducible-build verification of a tagged release (the
+determinism work for #1 is in place; the remaining step is the external rebuild
+match), and supply-chain review / SBOM (#10). Not store blockers, but they back
+up the "honestly private" claim.
 
 ## Pre-flight (every release)
 
@@ -161,9 +167,79 @@ notarizes and staples it. Requires the Apple Developer Program.
 
 ## Reproducible / verifiable builds (ROADMAP #1)
 
-Provenance + signing (above) are now in place. The remaining credibility step is
-**bit-for-bit reproducibility**: pin toolchain + dependency versions, document the
-exact build environment, and make an independent rebuild from this source produce
-byte-identical artifacts (the prerequisite for F-Droid's reproducible-build
-verification). An easy early win to capture for that work is honouring
-`SOURCE_DATE_EPOCH` so archive/build timestamps are deterministic.
+This is the credibility backbone of the privacy claim: anyone should be able to
+prove the shipped binary was built from this source.
+
+### Provenance + signing — **done**
+
+Every release carries SLSA build-provenance attestations and a keyless cosign
+signature over `SHA256SUMS` (see [Verifying a release](#verifying-a-release)),
+plus gated platform code-signing. No maintainer secrets are involved in producing
+the provenance.
+
+### Determinism — **in place for Android**
+
+The goal is bit-for-bit reproducibility so an independent rebuild from source
+yields byte-identical artifacts — the prerequisite for F-Droid's
+reproducible-build badge. What's pinned and configured (full table and rationale
+in [docs/reproducibility.md](docs/reproducibility.md)):
+
+- **Pinned build inputs**, recorded here, in the F-Droid recipe, and in the
+  `reproducibility` workflow: Flutter `3.44.2`
+  (`c9a6c484230f8b5e408ec57be1ef71dee1e77020`, engine `77e2e94772`, Dart
+  `3.12.2`), Gradle `9.1.0`, AGP `9.0.1`, Kotlin `2.3.20`, **Java 17**,
+  compileSdk/targetSdk `36`, minSdk `24`, NDK `28.2.13676358`, build-tools
+  `36.1.0`.
+- **`SOURCE_DATE_EPOCH`** derived from the tag commit's date, honoured by the
+  release archive packaging (deterministic `tar.gz`; normalised mtimes before the
+  Windows zip). macOS archives are left as-is (out of scope; F-Droid is
+  Android-only).
+- **`app/android/app/build.gradle.kts`**: the Play **dependency-metadata blob is
+  disabled** (`dependenciesInfo { includeInApk = false; includeInBundle = false }`)
+  — it is non-deterministic and alone defeats any byte comparison — and **R8 /
+  resource shrinking is left off** (R8 output isn't byte-stable across toolchain
+  versions). Both decisions are documented inline.
+
+### Prove it — the double-build check
+
+Two clean release builds from the same commit must be byte-identical apart from
+the signature. Locally:
+
+```sh
+# From the repo root (use the pinned toolchain; ideally JDK 17).
+tool/reproducibility/build_twice.sh /tmp/rune-repro
+# -> "IDENTICAL apart from signature: N entries match"  (exit 0), or the
+#    differing entries (exit 1).
+```
+
+In CI, the [`reproducibility`](.github/workflows/reproducibility.yml) workflow
+(**Actions → reproducibility → Run workflow**, manual-only) builds the APK twice
+in two *separate* clean checkouts on Linux and runs the same comparator
+([`tool/reproducibility/compare_apks.py`](tool/reproducibility/compare_apks.py)),
+uploading both APKs and a diffoscope report.
+
+**Evidence so far:** on a fixed toolchain, two clean builds are byte-for-byte
+identical (same SHA-256, signature included — Flutter 3.44.2 signs v2-only, so
+there are no JAR signature files to differ). That rules out timestamps, entry
+ordering, nondeterministic compression, and the dependency blob. It does **not**
+yet prove an independent rebuild on a *different* machine matches the published
+APK — the two-checkout Linux CI job tests path-independence, and F-Droid's own
+rebuild is the final word. The honest, measured detail and the residual
+nondeterminism (JDK major, host OS) are in
+[docs/reproducibility.md](docs/reproducibility.md).
+
+### F-Droid submission
+
+F-Droid rebuilds from source and, on a byte match, ships our signed APK with a
+"reproducible" badge. Prepared in-repo:
+
+- **Store listing**: [`fastlane/metadata/android/en-US/`](fastlane/metadata/android/en-US/)
+  (title, short/full description, changelog, phone screenshot) — F-Droid reads it
+  straight from this repo.
+- **Build recipe**: [`docs/fdroid/co.rorystandley.rune.yml`](docs/fdroid/co.rorystandley.rune.yml)
+  (License `GPL-3.0-or-later`, `subdir: app`, pinned Flutter/NDK, the exact build
+  commands, `Binaries:` pointing at the published APK for reproducible
+  verification, AntiFeatures: none).
+- **How to submit** the merge request to `gitlab.com/fdroid/fdroiddata`, plus the
+  two values to finalise first (a `v0.1.0` tag and the release key's SHA-256):
+  [`docs/fdroid/README.md`](docs/fdroid/README.md).

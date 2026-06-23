@@ -1,0 +1,69 @@
+# F-Droid build recipe for Rune (applicationId: co.rorystandley.rune)
+#
+# This is the metadata file to contribute to fdroiddata as
+#   metadata/co.rorystandley.rune.yml
+# See docs/fdroid/README.md for the submission steps. Placeholders that can only
+# be finalised at the first tagged release are marked "FILL BEFORE SUBMIT".
+#
+# Reproducibility: with `Binaries` + `AllowedAPKSigningKeys` set, F-Droid rebuilds
+# from source, grafts our signature with apksigcopier, and badges the build
+# "reproducible" iff the bytes match. The build inputs below are pinned to match
+# RELEASE.md and tool/reproducibility/.
+
+Categories:
+  - Writing
+  - Security
+License: GPL-3.0-or-later
+AuthorName: Rory Standley
+SourceCode: https://github.com/rorystandley/rune
+IssueTracker: https://github.com/rorystandley/rune/issues
+Changelog: https://github.com/rorystandley/rune/releases
+
+AutoName: Rune
+
+RepoType: git
+Repo: https://github.com/rorystandley/rune.git
+
+Builds:
+  - versionName: 0.1.0
+    versionCode: 1
+    # FILL BEFORE SUBMIT: this tag must exist and point at the released source.
+    # Releases are currently DRAFT; cut tag v0.1.0 first.
+    commit: v0.1.0
+    subdir: app
+    # F-Droid's Flutter srclib, checked out at the exact SDK tag we build with.
+    # This pins Flutter 3.44.2 (engine 77e2e94772, Dart 3.12.2).
+    srclibs:
+      - flutter@3.44.2
+    # NDK is a build input: AGP strips the bundled .so files with it. 28.2.13676358
+    # is NDK r28c and matches flutter.ndkVersion / build.gradle.kts.
+    ndk: 28.2.13676358
+    output: build/app/outputs/flutter-apk/app-release.apk
+    build: |
+      export SOURCE_DATE_EPOCH=$(git -C "$(git rev-parse --show-toplevel)" log -1 --pretty=%ct)
+      $$flutter$$/bin/flutter config --no-analytics --no-cli-animations
+      $$flutter$$/bin/flutter pub get
+      $$flutter$$/bin/flutter build apk --release
+    # Gradle 9.1.0 (wrapper), AGP 9.0.1, Kotlin 2.3.20, compileSdk/targetSdk 36,
+    # minSdk 24, Java 17 — all pinned in app/android (see RELEASE.md). R8/minify
+    # and the Play dependency-metadata blob are off for byte-stable output.
+
+# AntiFeatures: none. All dependencies are FOSS (cryptography, path_provider,
+# record, cupertino_icons) and the app has no trackers, no analytics, and no
+# proprietary blobs (verified — see PRIVACY.md and the dependency list in
+# app/pubspec.yaml). If F-Droid's scanner disagrees, list the finding here.
+
+# Reproducible-build verification: compare F-Droid's rebuild against the
+# developer-signed APK published on GitHub Releases.
+Binaries: https://github.com/rorystandley/rune/releases/download/v%v/notes-app-android.apk
+# FILL BEFORE SUBMIT: SHA-256 of the *release* signing certificate (NOT the debug
+# key). Once the upload keystore exists:
+#   apksigner verify --print-certs notes-app-android.apk | grep -i 'SHA-256'
+# or: keytool -list -v -keystore upload.jks -alias <alias>   (use the SHA-256, lowercased, no colons)
+AllowedAPKSigningKeys:
+  - 0000000000000000000000000000000000000000000000000000000000000000
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1
