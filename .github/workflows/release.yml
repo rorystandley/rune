@@ -121,14 +121,16 @@ jobs:
       - name: Build Android
         if: matrix.target == 'android'
         # Determinism is configured in app/android/app/build.gradle.kts (Play
-        # dependency-metadata off, R8 off) plus the pinned NDK above and the
-        # SOURCE_DATE_EPOCH in the job env. Verified by the `reproducibility`
-        # workflow; see RELEASE.md and docs/reproducibility.md.
+        # dependency-metadata off, R8 off), the pinned NDK above, SOURCE_DATE_EPOCH,
+        # and the path-normalising Android build wrapper used by the
+        # `reproducibility` workflow; see RELEASE.md and docs/reproducibility.md.
         run: |
-          flutter build apk --release
-          flutter build appbundle --release
           mkdir -p dist
-          cp build/app/outputs/flutter-apk/app-release.apk dist/notes-app-android.apk
+          ../tool/reproducibility/build_release_apk.sh dist/notes-app-android.apk
+          APP_DIR="$(pwd -P)"
+          flutter build appbundle --release \
+            --android-project-arg=filesystem-roots="$APP_DIR" \
+            --android-project-arg=filesystem-scheme=org-dartlang-root
           cp build/app/outputs/bundle/release/app-release.aab dist/notes-app-android.aab
 
       - name: Build Linux

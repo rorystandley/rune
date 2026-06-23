@@ -15,10 +15,14 @@ if [ "$#" -ne 1 ]; then
   echo "usage: $0 <output.apk>" >&2
   exit 2
 fi
-OUT="$1"
+OUT_ARG="$1"
+case "$OUT_ARG" in
+  /*) OUT="$OUT_ARG" ;;
+  *) OUT="$PWD/$OUT_ARG" ;;
+esac
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
 APP_DIR="$REPO_ROOT/app"
 
 # Honour SOURCE_DATE_EPOCH for any timestamped packaging. Derive it from the
@@ -36,10 +40,18 @@ flutter --version
 # result reflects the source alone.
 flutter clean
 flutter pub get
-flutter build apk --release
+"$SCRIPT_DIR/prepare_android_reproducible_build.sh" "$APP_DIR"
+flutter build apk --release \
+  --android-project-arg=filesystem-roots="$APP_DIR" \
+  --android-project-arg=filesystem-scheme=org-dartlang-root
 
 SRC="$APP_DIR/build/app/outputs/flutter-apk/app-release.apk"
 mkdir -p "$(dirname "$OUT")"
-cp "$SRC" "$OUT"
+SRC_ABS="$(cd "$(dirname "$SRC")" && pwd -P)/$(basename "$SRC")"
+OUT_ABS="$(cd "$(dirname "$OUT")" && pwd -P)/$(basename "$OUT")"
+if [ "$SRC_ABS" != "$OUT_ABS" ]; then
+  cp "$SRC" "$OUT_ABS"
+fi
+OUT="$OUT_ABS"
 echo "wrote $OUT"
 sha256sum "$OUT" 2>/dev/null || shasum -a 256 "$OUT"

@@ -5,15 +5,17 @@ This is the honest, evidence-backed companion to
 It records what has actually been measured, with what toolchain, and exactly
 what is **not yet** proven — so no claim here outruns the diff that backs it.
 
-> **Summary — not yet reproducible.** Two clean builds in the *same* directory
-> are byte-for-byte identical, which rules out the usual wreckers (build
-> timestamps, file ordering, nondeterministic compression, the Play
-> dependency-metadata blob). But the stronger two-checkout CI job — building the
-> same commit at two *different* paths, as any independent rebuilder (and
-> F-Droid) does — **fails**: the Dart AOT libraries `libapp.so` and
-> `libdartjni.so` differ across build paths. So the build is **not bit-for-bit
-> reproducible yet**; the residual is build-path dependence in the AOT snapshot.
-> See [Residual nondeterminism](#residual-nondeterminism).
+> **Summary — reproducible in the two-checkout CI gate.** The failed
+> two-checkout run 28015970937 was traced to two Android native-library problems:
+> Flutter compiled the generated Dart plugin registrant into `libapp.so` with an
+> absolute checkout-path `file://` URI, and package:jni linked `libdartjni.so`
+> with a path-varying GNU build-id. Rune now patches the pinned disposable
+> Flutter SDK and package:jni build input before Android release APK builds. A
+> local two-checkout build at different paths reports
+> `IDENTICAL apart from signature: 183 entries match`; the authoritative
+> Linux/JDK 17 GitHub `reproducibility` workflow is also green
+> ([run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978),
+> commit `43c360d`).
 
 ## What "reproducible" has to mean here
 
@@ -33,6 +35,10 @@ The check lives in [`tool/reproducibility/`](../tool/reproducibility/):
   which is not a ZIP entry). Exits non-zero on any other difference.
 - [`build_release_apk.sh`](../tool/reproducibility/build_release_apk.sh) — one
   clean release build into a chosen path, honouring `SOURCE_DATE_EPOCH`.
+- [`prepare_android_reproducible_build.sh`](../tool/reproducibility/prepare_android_reproducible_build.sh)
+  — idempotently patches the disposable Flutter SDK and package:jni source used
+  by the Android release build so generated Dart source URIs and JNI build-ids
+  are path-independent.
 - [`build_twice.sh`](../tool/reproducibility/build_twice.sh) — local
   convenience: build twice, then run the comparator.
 
@@ -72,45 +78,75 @@ Two deliberate decisions:
   otherwise embeds a dependency-tree blob encrypted to a Google public key; it is
   non-deterministic (fresh bytes every build) and alone defeats any byte
   comparison. Turning it off is a hard F-Droid requirement.
+- **Generated-toolchain patching.** Flutter `3.44.2` has the
+  `FileSystemRoots`/`FileSystemScheme` mechanism needed to turn absolute
+  generated-file paths into stable synthetic URIs, but its Android Gradle helper
+  does not forward those values to `flutter assemble`, and the compiler URI
+  rewrite uses constructor defaults rather than the per-build roots. The wrapper
+  patches those two pinned Flutter files in the throwaway SDK clone, then passes
+  `filesystem-roots=<canonical app dir>` and
+  `filesystem-scheme=org-dartlang-root`. The same wrapper patches package:jni
+  `1.0.0`'s Android CMake link options with `-Wl,--build-id=none`, because the
+  linked bytes were otherwise identical after zeroing `.note.gnu.build-id`.
 
-## Evidence: same-host, same-directory double build (the weaker test)
+## Evidence: two-checkout path independence
 
-> This rebuilds in the *same* directory, so it cannot catch build-path
-> dependence — which the two-checkout CI job later exposed (see
-> [Residual nondeterminism](#residual-nondeterminism)). The identical result
-> below therefore proves only same-path determinism, **not** reproducibility.
+### Failed baseline
 
-Ran [`build_twice.sh`](../tool/reproducibility/build_twice.sh) on commit at the
-time of writing. Two clean `flutter build apk --release` builds:
+GitHub Actions run 28015970937 (2026-06-23) built the same commit at
+`/home/runner/work/rune/rune/a` and `/home/runner/work/rune/rune/b`. The APK
+entry list, timestamps, compression, resources, `classes.dex`, and
+`libflutter.so` matched; six native entries differed:
 
 ```
+lib/{arm64-v8a,armeabi-v7a,x86_64}/{libapp.so,libdartjni.so}
+```
+
+`diffoscope` and direct `strings`/`readelf` checks showed:
+
+- `libapp.so` embedded
+  `file:///home/runner/work/rune/rune/{a,b}/app/.dart_tool/flutter_build/dart_plugin_registrant.dart`.
+  The path also changed derived Dart snapshot strings such as the
+  `_PluginRegistrant@...` name hash, so zeroing the ELF build-id was not enough.
+- `libdartjni.so` contained no differing source strings. After zeroing only its
+  `.note.gnu.build-id` bytes, each ABI pair became identical, proving its
+  residual was the native linker's build-id note.
+
+### Local two-path proof after the fix
+
+To validate before pushing, the working tree was copied to two different
+physical paths (`/private/tmp/rune-two/a` and `/private/tmp/rune-two/b`) and
+built with the pinned Flutter `3.44.2`, NDK `28.2.13676358`, and a temporary pub
+cache. The comparator passed:
+
+```
+build-a.apk  sha256 4078a084295be6ddb6d3df7bc7d2f49561be4e84e247c4dcea1210c8d45c89cb
+build-b.apk  sha256 4078a084295be6ddb6d3df7bc7d2f49561be4e84e247c4dcea1210c8d45c89cb
 IDENTICAL apart from signature: 183 entries match
   (names, order, compression, CRC, and compressed bytes).
-
-build-1.apk  sha256 41dc5602964052b7bd51b1533db40ee1a1865b20bc4bfc7be0ea22fe372ab24c
-build-2.apk  sha256 41dc5602964052b7bd51b1533db40ee1a1865b20bc4bfc7be0ea22fe372ab24c
-cmp: byte-for-byte identical (signature included), 52,953,120 bytes
 ```
 
-The two APKs were not merely identical apart from the signature — they were
-**fully identical**, signature included. Two reasons:
+The patched frontend command now compiles the generated registrant as
+`org-dartlang-root:///.dart_tool/flutter_build/dart_plugin_registrant.dart`
+instead of a checkout-specific `file://` URI, and `readelf -n` on
+`libdartjni.so` shows only `.note.android.ident` (no GNU build-id note).
 
-1. AGP normalises ZIP entry timestamps to a constant, and with the
-   dependency-metadata blob disabled there is no per-build random data left in
-   the non-signature portion.
-2. The APK is signed **v2-only** (APK Signature Scheme v2; no v1/JAR signature,
-   confirmed with `apksigner verify --verbose`). Signing the identical content
-   with the identical key produces the identical signing block, so even the
-   signature matched in this same-key run.
+### Linux/JDK 17 CI proof
 
-Local toolchain used for this run (recorded for honesty — it is **not** all the
-pinned set above):
+The authoritative GitHub Actions gate passed on 2026-06-23:
+[reproducibility run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978)
+(`workflow_dispatch`, commit `43c360d`). It built the same commit in two clean
+Linux checkouts (`a/` and `b/`) and `compare_apks.py` reported all 183
+non-signature entries identical.
+
+Local toolchain used for this run (recorded for honesty — the authoritative CI
+run uses Linux/JDK 17):
 
 | | |
 |---|---|
 | Host | macOS (Darwin 25.5.0), arm64 |
 | Flutter / engine / Dart | `3.44.2` (`c9a6c48423`) / `77e2e94772` / `3.12.2` |
-| JDK | **21.0.9** (Android Studio JBR) — note: CI and F-Droid use **17** |
+| JDK | **21.0.9** (Android Studio JBR) — CI and F-Droid use **17** |
 | Gradle / AGP / Kotlin | `9.1.0` / `9.0.1` / `2.3.20` |
 | NDK / build-tools / compileSdk | `28.2.13676358` / `36.1.0` / `36` |
 | Signing (local) | debug key, v2-only |
@@ -119,37 +155,22 @@ pinned set above):
 
 Honest scoping of what the evidence above does and does not establish.
 
-**Proven (same host, same *directory*):** no nondeterminism from build
-timestamps, ZIP entry ordering, compression, the bundled engine
-(`libflutter.so`), Flutter asset bundling, or the dependency-metadata blob — a
-clean rebuild at the same path reproduces the bytes exactly. **But** the AOT
-snapshot (`libapp.so`, `libdartjni.so`) reproduces *only while the build path is
-constant*; across different paths it differs (item 1 below), so it is **not**
-proven deterministic.
+**Proven locally and in CI:** no nondeterminism from build timestamps, ZIP entry
+ordering, compression, the bundled engine (`libflutter.so`), Flutter asset
+bundling, the dependency-metadata blob, the generated Dart plugin registrant
+path, or package:jni's native build-id. A clean rebuild at two different paths
+reproduces the APK bytes exactly.
 
 **Not yet proven — and how to close each:**
 
-1. **Path independence — FAILS (the current blocker).** `build_twice.sh` builds
-   twice in the *same* working directory, so an absolute build path leaking into
-   an artifact does not show up. The CI job
-   [`reproducibility.yml`](../.github/workflows/reproducibility.yml) builds the
-   same commit at two *different* checkout paths (`a/` vs `b/`) on Linux/JDK 17.
-   It was run on 2026-06-23 (run 28015970937) and **failed**: six native-library
-   entries differ — `lib/{arm64-v8a,armeabi-v7a,x86_64}/{libapp.so,libdartjni.so}`.
-   This is unresolved **build-path dependence in the Dart AOT snapshot**
-   (`gen_snapshot` embeds the build directory into `libapp.so`). Until it is fixed
-   — build at a canonical path, or strip the embedded path — Rune is **not**
-   reproducible across independent builds, and F-Droid's verification cannot pass.
-2. **JDK major/vendor.** This local run used JDK 21 (Android Studio's JBR); CI
+1. **JDK major/vendor.** The local run used JDK 21 (Android Studio's JBR); CI
    and F-Droid use JDK 17. `javac`/`d8` output can differ across JDK majors, so
-   the **authoritative** rebuild must use JDK 17, as pinned. Same-host identity
-   under JDK 21 does not certify a JDK-17 rebuild — the Linux/JDK-17 CI job does.
-3. **Host OS / architecture.** This run was on macOS/arm64; F-Droid and the
+   the Linux/JDK 17 workflow is the authoritative path-independence proof.
+2. **Host OS / architecture.** The local run was on macOS/arm64; F-Droid and the
    release pipeline build on Linux/x64. `gen_snapshot` is a host tool emitting
-   target-arch code; output is expected to be host-independent, but that has not
-   been cross-checked here. The Linux CI job closes the gap against F-Droid's
-   environment (also Linux).
-4. **The real F-Droid test.** None of the above equals "F-Droid rebuilt it and
+   target-arch code; the Linux CI job closes the gap against F-Droid's
+   environment (also Linux/x64).
+3. **The real F-Droid test.** None of the above equals "F-Droid rebuilt it and
    the bytes matched the published APK." That can only be confirmed once the app
    is submitted and F-Droid's build server reports `Verified`. Until then this
    document claims only what the diffs above support: deterministic on a fixed
@@ -164,6 +185,12 @@ tool/reproducibility/build_twice.sh /tmp/rune-repro
 #    or a list of the entries that differ and exit 1.
 ```
 
-Or trigger the two-path Linux build under Actions → **reproducibility** → Run
-workflow, and download the `reproducibility` artifact (both APKs + a diffoscope
-report) from the run.
+That helper rebuilds in one checkout. To test path independence locally, copy the
+working tree to two physical paths, run
+[`build_release_apk.sh`](../tool/reproducibility/build_release_apk.sh) once in
+each copy with the same `SOURCE_DATE_EPOCH`, then compare the two APKs with
+[`compare_apks.py`](../tool/reproducibility/compare_apks.py).
+
+The authoritative proof is the two-path Linux build under Actions →
+**reproducibility** → Run workflow. Download the `reproducibility` artifact (both
+APKs + a diffoscope report) from the run when investigating any future mismatch.

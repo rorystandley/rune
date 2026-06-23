@@ -23,16 +23,18 @@ Done:
   signing and macOS Developer ID signing + notarization. See
   [Verifying a release](#verifying-a-release).
 - Android build determinism (toolchain pinned; Play dependency-metadata blob and
-  R8 off; `SOURCE_DATE_EPOCH`; F-Droid recipe + Fastlane metadata in-repo).
-  **Not yet bit-for-bit reproducible** — the two-checkout CI build fails on
-  build-path-dependent Dart AOT libs (`libapp.so`/`libdartjni.so`). See
+  R8 off; `SOURCE_DATE_EPOCH`; generated-path and native build-id fixes;
+  F-Droid recipe + Fastlane metadata in-repo). **Two-checkout CI reproducible** —
+  the `reproducibility` workflow is green
+  ([run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978),
+  commit `43c360d`). See
   [Reproducible / verifiable builds](#reproducible--verifiable-builds-roadmap-1)
   and [docs/reproducibility.md](docs/reproducibility.md).
 
 Before a public 1.0 (from [ROADMAP.md](ROADMAP.md)): independent crypto review;
-**bit-for-bit reproducibility for #1** — the determinism config is in place, but
-the Dart AOT libraries are still build-path-dependent (the two-checkout CI build
-fails), which must be fixed before F-Droid can verify a tagged release; and
+**bit-for-bit reproducibility for #1** — the Android APK now passes local and
+Linux/JDK 17 two-checkout byte comparisons, but the first tagged release still
+needs the real F-Droid verification result; and
 supply-chain review / SBOM (#10). Not store blockers, but they back up the
 "honestly private" claim.
 
@@ -179,7 +181,7 @@ signature over `SHA256SUMS` (see [Verifying a release](#verifying-a-release)),
 plus gated platform code-signing. No maintainer secrets are involved in producing
 the provenance.
 
-### Determinism — **configured, not yet reproducible**
+### Determinism — **two-checkout CI reproducible**
 
 The goal is bit-for-bit reproducibility so an independent rebuild from source
 yields byte-identical artifacts — the prerequisite for F-Droid's
@@ -201,6 +203,10 @@ in [docs/reproducibility.md](docs/reproducibility.md)):
   — it is non-deterministic and alone defeats any byte comparison — and **R8 /
   resource shrinking is left off** (R8 output isn't byte-stable across toolchain
   versions). Both decisions are documented inline.
+- **Android path normalisation**: the release/F-Droid APK wrapper patches the
+  pinned disposable Flutter SDK so generated Dart plugin registrant sources enter
+  the AOT snapshot as `org-dartlang-root:///...`, not checkout-specific `file://`
+  paths, and patches package:jni's Android link step with `-Wl,--build-id=none`.
 
 ### Prove it — the double-build check
 
@@ -220,14 +226,16 @@ in two *separate* clean checkouts on Linux and runs the same comparator
 ([`tool/reproducibility/compare_apks.py`](tool/reproducibility/compare_apks.py)),
 uploading both APKs and a diffoscope report.
 
-**Evidence:** two clean builds in the *same* directory are byte-for-byte
-identical (same SHA-256), which rules out timestamps, entry ordering,
-nondeterministic compression, and the dependency blob. But the stronger
-two-checkout CI job — building the same commit at two *different* paths — **fails**
-(run 28015970937, 2026-06-23): the Dart AOT libraries `libapp.so` and
-`libdartjni.so` differ across build paths. So the build is **not yet reproducible**
-across independent checkouts; the residual is build-path dependence in the AOT
-snapshot, which must be fixed before F-Droid can verify it. Full detail in
+**Evidence:** the failed CI baseline (run 28015970937, 2026-06-23) differed only
+in `libapp.so` and `libdartjni.so`; `libapp.so` embedded the generated plugin
+registrant's absolute checkout path, while `libdartjni.so` differed only by GNU
+build-id. After the wrapper fix, a local two-checkout build at different paths
+produced identical APKs:
+`IDENTICAL apart from signature: 183 entries match` (SHA-256
+`4078a084295be6ddb6d3df7bc7d2f49561be4e84e247c4dcea1210c8d45c89cb` for both
+APKs). The Linux/JDK 17 GitHub gate also passed:
+[`reproducibility` run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978)
+on commit `43c360d`. Full detail in
 [docs/reproducibility.md](docs/reproducibility.md).
 
 ### F-Droid submission
