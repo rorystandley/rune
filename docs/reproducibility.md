@@ -5,16 +5,17 @@ This is the honest, evidence-backed companion to
 It records what has actually been measured, with what toolchain, and exactly
 what is **not yet** proven — so no claim here outruns the diff that backs it.
 
-> **Summary — locally path-independent; CI proof pending.** The failed
+> **Summary — reproducible in the two-checkout CI gate.** The failed
 > two-checkout run 28015970937 was traced to two Android native-library problems:
 > Flutter compiled the generated Dart plugin registrant into `libapp.so` with an
 > absolute checkout-path `file://` URI, and package:jni linked `libdartjni.so`
 > with a path-varying GNU build-id. Rune now patches the pinned disposable
 > Flutter SDK and package:jni build input before Android release APK builds. A
-> local two-checkout build at different paths now reports
-> `IDENTICAL apart from signature: 183 entries match`; the GitHub
-> `reproducibility` workflow is the authoritative Linux/JDK 17 proof and should
-> be cited here once the branch run completes.
+> local two-checkout build at different paths reports
+> `IDENTICAL apart from signature: 183 entries match`; the authoritative
+> Linux/JDK 17 GitHub `reproducibility` workflow is also green
+> ([run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978),
+> commit `43c360d`).
 
 ## What "reproducible" has to mean here
 
@@ -130,6 +131,14 @@ The patched frontend command now compiles the generated registrant as
 instead of a checkout-specific `file://` URI, and `readelf -n` on
 `libdartjni.so` shows only `.note.android.ident` (no GNU build-id note).
 
+### Linux/JDK 17 CI proof
+
+The authoritative GitHub Actions gate passed on 2026-06-23:
+[reproducibility run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978)
+(`workflow_dispatch`, commit `43c360d`). It built the same commit in two clean
+Linux checkouts (`a/` and `b/`) and `compare_apks.py` reported all 183
+non-signature entries identical.
+
 Local toolchain used for this run (recorded for honesty — the authoritative CI
 run uses Linux/JDK 17):
 
@@ -146,29 +155,22 @@ run uses Linux/JDK 17):
 
 Honest scoping of what the evidence above does and does not establish.
 
-**Proven locally:** no nondeterminism from build timestamps, ZIP entry ordering,
-compression, the bundled engine (`libflutter.so`), Flutter asset bundling, the
-dependency-metadata blob, the generated Dart plugin registrant path, or
-package:jni's native build-id. A clean rebuild at two different local paths
+**Proven locally and in CI:** no nondeterminism from build timestamps, ZIP entry
+ordering, compression, the bundled engine (`libflutter.so`), Flutter asset
+bundling, the dependency-metadata blob, the generated Dart plugin registrant
+path, or package:jni's native build-id. A clean rebuild at two different paths
 reproduces the APK bytes exactly.
 
 **Not yet proven — and how to close each:**
 
-1. **Linux/JDK 17 path independence.** The local two-path result is strong, but
-   the authoritative gate is the Linux/JDK 17
-   [`reproducibility.yml`](../.github/workflows/reproducibility.yml) workflow,
-   because that is closest to F-Droid's environment. Replace this note with the
-   branch run id once it passes.
-2. **JDK major/vendor.** This local run used JDK 21 (Android Studio's JBR); CI
+1. **JDK major/vendor.** The local run used JDK 21 (Android Studio's JBR); CI
    and F-Droid use JDK 17. `javac`/`d8` output can differ across JDK majors, so
-   the **authoritative** rebuild must use JDK 17, as pinned. Same-host identity
-   under JDK 21 does not certify a JDK-17 rebuild — the Linux/JDK-17 CI job does.
-3. **Host OS / architecture.** This run was on macOS/arm64; F-Droid and the
+   the Linux/JDK 17 workflow is the authoritative path-independence proof.
+2. **Host OS / architecture.** The local run was on macOS/arm64; F-Droid and the
    release pipeline build on Linux/x64. `gen_snapshot` is a host tool emitting
-   target-arch code; output is expected to be host-independent, but that has not
-   been cross-checked here. The Linux CI job closes the gap against F-Droid's
-   environment (also Linux).
-4. **The real F-Droid test.** None of the above equals "F-Droid rebuilt it and
+   target-arch code; the Linux CI job closes the gap against F-Droid's
+   environment (also Linux/x64).
+3. **The real F-Droid test.** None of the above equals "F-Droid rebuilt it and
    the bytes matched the published APK." That can only be confirmed once the app
    is submitted and F-Droid's build server reports `Verified`. Until then this
    document claims only what the diffs above support: deterministic on a fixed

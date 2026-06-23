@@ -24,17 +24,17 @@ Done:
   [Verifying a release](#verifying-a-release).
 - Android build determinism (toolchain pinned; Play dependency-metadata blob and
   R8 off; `SOURCE_DATE_EPOCH`; generated-path and native build-id fixes;
-  F-Droid recipe + Fastlane metadata in-repo). **Locally path-independent; CI
-  proof pending** — the local two-checkout comparator is green, and the
-  `reproducibility` workflow is the Linux/JDK 17 gate to cite before claiming the
-  GitHub result. See
+  F-Droid recipe + Fastlane metadata in-repo). **Two-checkout CI reproducible** —
+  the `reproducibility` workflow is green
+  ([run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978),
+  commit `43c360d`). See
   [Reproducible / verifiable builds](#reproducible--verifiable-builds-roadmap-1)
   and [docs/reproducibility.md](docs/reproducibility.md).
 
 Before a public 1.0 (from [ROADMAP.md](ROADMAP.md)): independent crypto review;
-**bit-for-bit reproducibility for #1** — the Android APK now passes a local
-two-checkout byte comparison, but the Linux/JDK 17 `reproducibility` workflow
-must pass on the release commit before F-Droid can verify a tagged release; and
+**bit-for-bit reproducibility for #1** — the Android APK now passes local and
+Linux/JDK 17 two-checkout byte comparisons, but the first tagged release still
+needs the real F-Droid verification result; and
 supply-chain review / SBOM (#10). Not store blockers, but they back up the
 "honestly private" claim.
 
@@ -181,7 +181,7 @@ signature over `SHA256SUMS` (see [Verifying a release](#verifying-a-release)),
 plus gated platform code-signing. No maintainer secrets are involved in producing
 the provenance.
 
-### Determinism — **locally reproducible, CI proof pending**
+### Determinism — **two-checkout CI reproducible**
 
 The goal is bit-for-bit reproducibility so an independent rebuild from source
 yields byte-identical artifacts — the prerequisite for F-Droid's
@@ -233,9 +233,10 @@ build-id. After the wrapper fix, a local two-checkout build at different paths
 produced identical APKs:
 `IDENTICAL apart from signature: 183 entries match` (SHA-256
 `4078a084295be6ddb6d3df7bc7d2f49561be4e84e247c4dcea1210c8d45c89cb` for both
-APKs). Full detail in [docs/reproducibility.md](docs/reproducibility.md); replace
-this pending note with the GitHub `reproducibility` run id once the branch run
-passes.
+APKs). The Linux/JDK 17 GitHub gate also passed:
+[`reproducibility` run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978)
+on commit `43c360d`. Full detail in
+[docs/reproducibility.md](docs/reproducibility.md).
 
 ### F-Droid submission
 
