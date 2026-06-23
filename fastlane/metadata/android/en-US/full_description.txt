@@ -1,0 +1,39 @@
+Rune is a calm, fast notes app for people who don't want to trust an app with
+their data. Your notes never leave your device, they are encrypted at rest, and
+the app makes no network connections at all. There is no account, no cloud, and
+no sign-up.
+
+Privacy by construction, not by promise:
+
+* No telemetry, no analytics, no crash reporting, no advertising, no tracking —
+  none, not "anonymised", not "aggregated".
+* No networking code. Put your device in airplane mode and everything still
+  works. If anything ever tries to reach the network, that is a bug.
+* No account and no server. There is no "we" that could hold your data.
+
+Real encryption:
+
+* Your passphrase derives a key with Argon2id; notes are sealed with
+  XChaCha20-Poly1305 authenticated encryption. Only ciphertext is ever written
+  to disk.
+* The passphrase is never stored and is not recoverable. If you forget it, your
+  notes are gone — no reset, no backdoor. That is the price of real privacy.
+* A wrong passphrase simply cannot decrypt your notes.
+
+What you can do:
+
+* Create, edit, search, and organise plain-text notes with an Apple-Notes-style
+  layout that adapts from phone to desktop.
+* Auto-lock on inactivity and lock-on-background; the app starts locked.
+* Export an encrypted backup (safe to keep anywhere); plaintext export is gated
+  behind an explicit warning.
+* Capture voice notes — recording stays entirely on your device.
+
+Free and open source under the GNU GPLv3. The security-critical code is a small,
+dependency-light, pure-Dart core so it can be read and audited. Releases ship
+with cryptographic provenance (SLSA build-provenance attestations and a keyless
+cosign signature) and are built reproducibly, so you can verify the binary was
+built from this source.
+
+This is honest software: it tells you what it does not yet do. See the project's
+SECURITY.md for the threat model and current limitations.

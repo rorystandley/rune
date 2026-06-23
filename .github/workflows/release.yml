@@ -21,6 +21,12 @@ concurrency:
 
 env:
   FLUTTER_VERSION: "3.44.2"
+  # Pinned Android build input (NDK r28c) — matches flutter.ndkVersion,
+  # docs/fdroid/co.rorystandley.rune.yml and RELEASE.md.
+  NDK_VERSION: "28.2.13676358"
+  # Deterministic packaging: force UTC so any timestamp that does slip through is
+  # at least stable across runners.
+  TZ: "UTC"
 
 jobs:
   build:
@@ -40,6 +46,14 @@ jobs:
         working-directory: app
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # Deterministic build clock. Derive SOURCE_DATE_EPOCH from the tag commit's
+      # date so an independent rebuild of the same commit gets the same value;
+      # honoured by the archive packaging below (and exported into the Android
+      # build). The tag checkout has depth 1, which is enough for the tip date.
+      - name: Set SOURCE_DATE_EPOCH
+        shell: bash
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> "$GITHUB_ENV"
 
       - name: Set up Java (Android)
         if: matrix.target == 'android'
@@ -63,6 +77,14 @@ jobs:
       - name: Flutter version
         shell: bash
         run: flutter --version
+
+      # Pin the NDK that AGP uses to strip the bundled .so files, so the published
+      # APK/AAB is built against the same NDK the reproducibility job and F-Droid use.
+      - name: Pin the Android NDK
+        if: matrix.target == 'android'
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION" >/dev/null
+          echo "installed NDK $NDK_VERSION"
 
       - name: Linux build deps
         if: matrix.target == 'linux'
@@ -98,6 +120,10 @@ jobs:
 
       - name: Build Android
         if: matrix.target == 'android'
+        # Determinism is configured in app/android/app/build.gradle.kts (Play
+        # dependency-metadata off, R8 off) plus the pinned NDK above and the
+        # SOURCE_DATE_EPOCH in the job env. Verified by the `reproducibility`
+        # workflow; see RELEASE.md and docs/reproducibility.md.
         run: |
           flutter build apk --release
           flutter build appbundle --release
@@ -110,7 +136,16 @@ jobs:
         run: |
           flutter build linux --release
           mkdir -p dist
-          tar -czf dist/notes-app-linux-x64.tar.gz -C build/linux/x64/release/bundle .
+          # Deterministic tar.gz: sort entries by name, stamp every entry with
+          # SOURCE_DATE_EPOCH, zero owner/group, drop nondeterministic pax atime/ctime
+          # headers, and gzip with -n (no name/timestamp in the gzip header). The
+          # Flutter Linux bundle itself is not guaranteed reproducible — this just
+          # captures the cheap archive-level determinism win.
+          tar --sort=name --mtime="@${SOURCE_DATE_EPOCH}" \
+              --owner=0 --group=0 --numeric-owner \
+              --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime \
+              -C build/linux/x64/release/bundle -cf - . \
+            | gzip -n > dist/notes-app-linux-x64.tar.gz
 
       - name: Build macOS
         if: matrix.target == 'macos'
@@ -178,6 +213,9 @@ jobs:
 
       - name: Package macOS
         if: matrix.target == 'macos'
+        # macOS reproducibility is out of scope (F-Droid is Android-only). ditto
+        # preserves timestamps, so this archive is not byte-deterministic — that is
+        # acceptable per RELEASE.md; provenance + cosign still cover it.
         run: |
           mkdir -p dist
           ditto -c -k --sequesterRsrc --keepParent \
@@ -196,6 +234,10 @@ jobs:
         run: |
           flutter build windows --release
           mkdir -p dist
+          # Cheap determinism win: normalise file mtimes to SOURCE_DATE_EPOCH before
+          # zipping so the archive isn't stamped with the build time. (Full Windows
+          # build reproducibility is out of scope — see RELEASE.md.)
+          find build/windows/x64/runner/Release -exec touch -d "@${SOURCE_DATE_EPOCH}" {} +
           7z a -tzip dist/notes-app-windows-x64.zip ./build/windows/x64/runner/Release/*
 
       - name: Upload artifacts

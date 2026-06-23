@@ -1,0 +1,1 @@
+Private, local-first, encrypted notes. No network, no telemetry, no trackers.

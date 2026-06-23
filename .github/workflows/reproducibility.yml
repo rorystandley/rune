@@ -1,0 +1,106 @@
+name: reproducibility
+
+# Proves Rune's Android release APK is reproducible (ROADMAP #1): builds it TWICE
+# in two independent clean checkouts and fails if anything differs outside the
+# signature. The comparison and build scripts live in tool/reproducibility/ and
+# are documented in RELEASE.md → "Reproducible / verifiable builds".
+#
+# Manual-only (workflow_dispatch): two full Android release builds are far too
+# heavy to run on every push, and the security signal already comes from `ci.yml`.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reproducibility-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned build inputs. Keep these in lockstep with docs/fdroid/co.rorystandley.rune.yml
+  # and the table in RELEASE.md.
+  FLUTTER_VERSION: "3.44.2"
+  NDK_VERSION: "28.2.13676358"
+
+jobs:
+  double-build:
+    name: double-build & diff
+    runs-on: ubuntu-latest
+    steps:
+      # Two independent working trees of the same commit. Building each in its own
+      # checkout (rather than twice in one tree) is the stronger reproducibility
+      # test: nothing leaks from build A's tree into build B's.
+      - name: Checkout (tree A)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          path: a
+      - name: Checkout (tree B)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          path: b
+
+      - name: Set up Java (17)
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Install Flutter without a third-party action (ruleset bans the unpinned
+      # transitive actions/cache that subosito/flutter-action pulls in); clone the
+      # pinned tag exactly like ci.yml / release.yml do.
+      - name: Set up Flutter
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_VERSION" \
+            https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+      # AGP strips the bundled .so files with NDK tools, so the NDK version is a
+      # build input. Pin it explicitly rather than relying on whatever the runner
+      # image happens to ship.
+      - name: Pin the Android NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION" >/dev/null
+          echo "installed NDK $NDK_VERSION"
+
+      # Both builds must see the same SOURCE_DATE_EPOCH; derive it once from the
+      # commit date (identical in both trees) and share it via the job env.
+      - name: Shared SOURCE_DATE_EPOCH
+        run: echo "SOURCE_DATE_EPOCH=$(git -C a log -1 --pretty=%ct)" >> "$GITHUB_ENV"
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Build APK — tree A
+        run: a/tool/reproducibility/build_release_apk.sh "$RUNNER_TEMP/build-a.apk"
+
+      - name: Build APK — tree B
+        run: b/tool/reproducibility/build_release_apk.sh "$RUNNER_TEMP/build-b.apk"
+
+      # The gate: byte-identical apart from the signature, or this job fails.
+      - name: Diff APKs (ignoring the signature)
+        run: |
+          python3 a/tool/reproducibility/compare_apks.py \
+            "$RUNNER_TEMP/build-a.apk" "$RUNNER_TEMP/build-b.apk"
+
+      # Human-readable deep diff for the record. Never gates the job; captured as
+      # an artifact so any residual difference can be inspected.
+      - name: diffoscope report (best effort)
+        if: always()
+        run: |
+          sudo apt-get update && sudo apt-get install -y diffoscope || true
+          if command -v diffoscope >/dev/null 2>&1; then
+            diffoscope "$RUNNER_TEMP/build-a.apk" "$RUNNER_TEMP/build-b.apk" \
+              --text "$RUNNER_TEMP/diffoscope.txt" || true
+          fi
+
+      - name: Upload APKs + diff report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: reproducibility
+          path: |
+            ${{ runner.temp }}/build-a.apk
+            ${{ runner.temp }}/build-b.apk
+            ${{ runner.temp }}/diffoscope.txt
+          if-no-files-found: warn

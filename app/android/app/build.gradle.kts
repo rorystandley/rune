@@ -25,6 +25,19 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // --- Reproducible builds (ROADMAP #1) ---------------------------------------
+    // Drop the Play "dependency metadata" block from the APK and AAB. AGP otherwise
+    // embeds a blob describing the dependency tree, encrypted to a Google public key.
+    // That blob is non-deterministic (fresh bytes every build) and would by itself
+    // defeat any bit-for-bit comparison, so it is the first thing F-Droid's
+    // reproducible-build verification requires turned off. It also leaks the full
+    // dependency graph, which we have no reason to ship. See docs/fdroid/ and
+    // RELEASE.md → "Reproducible / verifiable builds".
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "co.rorystandley.rune"
@@ -50,6 +63,13 @@ android {
 
     buildTypes {
         release {
+            // R8 / code shrinking is intentionally left OFF. R8's output is not
+            // guaranteed byte-stable across toolchain versions, which would put the
+            // reproducible-build goal at risk; the app is small and ships no Java/Kotlin
+            // hot paths, so there is little to gain. If shrinking is enabled later it
+            // must be re-verified against the double-build check (see RELEASE.md).
+            isMinifyEnabled = false
+            isShrinkResources = false
             // Uses the upload keystore when android/key.properties exists; otherwise
             // falls back to debug signing so `flutter run --release` still works locally.
             signingConfig = if (keystorePropertiesFile.exists()) {
