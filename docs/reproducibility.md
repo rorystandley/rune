@@ -5,12 +5,14 @@ This is the honest, evidence-backed companion to
 It records what has actually been measured, with what toolchain, and exactly
 what is **not yet** proven — so no claim here outruns the diff that backs it.
 
-> **Summary.** Two clean release builds of the Android APK from the same commit
-> are **byte-for-byte identical** on a fixed toolchain. That rules out the usual
-> reproducibility wreckers (build timestamps, file ordering, nondeterministic
-> compression, the Play dependency-metadata blob). It does **not** by itself
-> prove the published APK matches an independent rebuild on a *different*
-> machine — that is what F-Droid's verification and the two-path CI job test.
+> **Summary — not yet reproducible.** Two clean builds in the *same* directory
+> are byte-for-byte identical, which rules out the usual wreckers (build
+> timestamps, file ordering, nondeterministic compression, the Play
+> dependency-metadata blob). But the stronger two-checkout CI job — building the
+> same commit at two *different* paths, as any independent rebuilder (and
+> F-Droid) does — **fails**: the Dart AOT libraries `libapp.so` and
+> `libdartjni.so` differ across build paths. So the build is **not bit-for-bit
+> reproducible yet**; the residual is build-path dependence in the AOT snapshot.
 > See [Residual nondeterminism](#residual-nondeterminism).
 
 ## What "reproducible" has to mean here
@@ -71,7 +73,12 @@ Two deliberate decisions:
   non-deterministic (fresh bytes every build) and alone defeats any byte
   comparison. Turning it off is a hard F-Droid requirement.
 
-## Evidence: same-host double build
+## Evidence: same-host, same-directory double build (the weaker test)
+
+> This rebuilds in the *same* directory, so it cannot catch build-path
+> dependence — which the two-checkout CI job later exposed (see
+> [Residual nondeterminism](#residual-nondeterminism)). The identical result
+> below therefore proves only same-path determinism, **not** reproducibility.
 
 Ran [`build_twice.sh`](../tool/reproducibility/build_twice.sh) on commit at the
 time of writing. Two clean `flutter build apk --release` builds:
@@ -112,20 +119,27 @@ pinned set above):
 
 Honest scoping of what the evidence above does and does not establish.
 
-**Proven (same host, same toolchain):** no nondeterminism from build
-timestamps, ZIP entry ordering, compression, the AOT snapshot (`libapp.so`), the
-bundled engine (`libflutter.so`), Flutter asset bundling, or the dependency
-metadata blob. A clean rebuild reproduces the bytes exactly.
+**Proven (same host, same *directory*):** no nondeterminism from build
+timestamps, ZIP entry ordering, compression, the bundled engine
+(`libflutter.so`), Flutter asset bundling, or the dependency-metadata blob — a
+clean rebuild at the same path reproduces the bytes exactly. **But** the AOT
+snapshot (`libapp.so`, `libdartjni.so`) reproduces *only while the build path is
+constant*; across different paths it differs (item 1 below), so it is **not**
+proven deterministic.
 
 **Not yet proven — and how to close each:**
 
-1. **Path independence.** `build_twice.sh` builds twice in the *same* working
-   directory, so an absolute build path leaking into an artifact would not show
-   up. The CI job
-   [`reproducibility.yml`](../.github/workflows/reproducibility.yml) builds in
-   two *different* checkout paths (`a/` vs `b/`) on Linux and is the check that
-   actually exercises path-independence. Run it (Actions → reproducibility → Run
-   workflow) and confirm it stays green.
+1. **Path independence — FAILS (the current blocker).** `build_twice.sh` builds
+   twice in the *same* working directory, so an absolute build path leaking into
+   an artifact does not show up. The CI job
+   [`reproducibility.yml`](../.github/workflows/reproducibility.yml) builds the
+   same commit at two *different* checkout paths (`a/` vs `b/`) on Linux/JDK 17.
+   It was run on 2026-06-23 (run 28015970937) and **failed**: six native-library
+   entries differ — `lib/{arm64-v8a,armeabi-v7a,x86_64}/{libapp.so,libdartjni.so}`.
+   This is unresolved **build-path dependence in the Dart AOT snapshot**
+   (`gen_snapshot` embeds the build directory into `libapp.so`). Until it is fixed
+   — build at a canonical path, or strip the embedded path — Rune is **not**
+   reproducible across independent builds, and F-Droid's verification cannot pass.
 2. **JDK major/vendor.** This local run used JDK 21 (Android Studio's JBR); CI
    and F-Droid use JDK 17. `javac`/`d8` output can differ across JDK majors, so
    the **authoritative** rebuild must use JDK 17, as pinned. Same-host identity
