@@ -24,7 +24,7 @@ Done:
   [Verifying a release](#verifying-a-release).
 - Android build determinism (toolchain pinned; Play dependency-metadata blob and
   R8 off; `SOURCE_DATE_EPOCH`; generated-path and native build-id fixes;
-  F-Droid recipe + Fastlane metadata in-repo). **Two-checkout CI reproducible** —
+  Fastlane metadata in-repo). **Two-checkout CI reproducible** —
   the `reproducibility` workflow is green
   ([run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978),
   commit `43c360d`). See
@@ -33,8 +33,8 @@ Done:
 
 Before a public 1.0 (from [ROADMAP.md](ROADMAP.md)): independent crypto review;
 **bit-for-bit reproducibility for #1** — the Android APK now passes local and
-Linux/JDK 17 two-checkout byte comparisons, but the first tagged release still
-needs the real F-Droid verification result; and
+Linux/JDK 17 two-checkout byte comparisons, with independent third-party
+reproducible-build verification the remaining external step; and
 supply-chain review / SBOM (#10). Not store blockers, but they back up the
 "honestly private" claim.
 
@@ -188,8 +188,8 @@ yields byte-identical artifacts — the prerequisite for F-Droid's
 reproducible-build badge. What's pinned and configured (full table and rationale
 in [docs/reproducibility.md](docs/reproducibility.md)):
 
-- **Pinned build inputs**, recorded here, in the F-Droid recipe, and in the
-  `reproducibility` workflow: Flutter `3.44.2`
+- **Pinned build inputs**, recorded here and in the `reproducibility` workflow:
+  Flutter `3.44.2`
   (`c9a6c484230f8b5e408ec57be1ef71dee1e77020`, engine `77e2e94772`, Dart
   `3.12.2`), Gradle `9.1.0`, AGP `9.0.1`, Kotlin `2.3.20`, **Java 17**,
   compileSdk/targetSdk `36`, minSdk `24`, NDK `28.2.13676358`, build-tools
@@ -237,19 +237,3 @@ APKs). The Linux/JDK 17 GitHub gate also passed:
 [`reproducibility` run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978)
 on commit `43c360d`. Full detail in
 [docs/reproducibility.md](docs/reproducibility.md).
-
-### F-Droid submission
-
-F-Droid rebuilds from source and, on a byte match, ships our signed APK with a
-"reproducible" badge. Prepared in-repo:
-
-- **Store listing**: [`fastlane/metadata/android/en-US/`](fastlane/metadata/android/en-US/)
-  (title, short/full description, changelog, phone screenshot) — F-Droid reads it
-  straight from this repo.
-- **Build recipe**: [`docs/fdroid/co.rorystandley.rune.yml`](docs/fdroid/co.rorystandley.rune.yml)
-  (License `GPL-3.0-or-later`, `subdir: app`, pinned Flutter/NDK, the exact build
-  commands, `Binaries:` pointing at the published APK for reproducible
-  verification, AntiFeatures: none).
-- **How to submit** the merge request to `gitlab.com/fdroid/fdroiddata`, plus the
-  two values to finalise first (a `v0.1.0` tag and the release key's SHA-256):
-  [`docs/fdroid/README.md`](docs/fdroid/README.md).

@@ -6,8 +6,8 @@
 #
 # It proves *self-consistency* (this toolchain builds the same bytes twice). The
 # stronger property — that an independent rebuild on the pinned toolchain matches
-# the published APK — is what F-Droid verifies; the recipe in docs/fdroid/ pins
-# the toolchain for that. If diffoscope is installed, a full human-readable diff
+# the published APK — is what an independent rebuilder verifies; the toolchain is
+# pinned in RELEASE.md. If diffoscope is installed, a full human-readable diff
 # is written alongside the APKs for inspecting any residual differences.
 #
 # Usage: build_twice.sh [output-dir]   (default: a fresh temp dir)

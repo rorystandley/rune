@@ -49,8 +49,7 @@ CI runs the stronger, two-checkout version on demand:
 ## Pinned build inputs
 
 Reproducibility is only meaningful against a fixed toolchain. These are recorded
-here, in [RELEASE.md](../RELEASE.md), in the reproducibility workflow, and in the
-F-Droid recipe ([`docs/fdroid/co.rorystandley.rune.yml`](fdroid/co.rorystandley.rune.yml)):
+here, in [RELEASE.md](../RELEASE.md), and in the reproducibility workflow:
 
 | Input | Value | Pinned in |
 |-------|-------|-----------|

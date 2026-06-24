@@ -5,7 +5,7 @@
 # reproducibility CI job, which calls this once per clean checkout. It pins the
 # one build input that lives outside the toolchain — SOURCE_DATE_EPOCH, derived
 # from the current commit's date — and otherwise relies on the versions recorded
-# in RELEASE.md and docs/fdroid/co.rorystandley.rune.yml (Flutter, Gradle, AGP,
+# in RELEASE.md and docs/reproducibility.md (Flutter, Gradle, AGP,
 # NDK, compileSdk, Java 17). See RELEASE.md → "Reproducible / verifiable builds".
 #
 # Usage: build_release_apk.sh <output.apk>

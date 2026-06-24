@@ -31,7 +31,7 @@ android {
     // That blob is non-deterministic (fresh bytes every build) and would by itself
     // defeat any bit-for-bit comparison, so it is the first thing F-Droid's
     // reproducible-build verification requires turned off. It also leaks the full
-    // dependency graph, which we have no reason to ship. See docs/fdroid/ and
+    // dependency graph, which we have no reason to ship. See
     // RELEASE.md → "Reproducible / verifiable builds".
     dependenciesInfo {
         includeInApk = false
