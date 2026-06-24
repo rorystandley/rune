@@ -22,7 +22,7 @@ concurrency:
 env:
   FLUTTER_VERSION: "3.44.2"
   # Pinned Android build input (NDK r28c) — matches flutter.ndkVersion,
-  # docs/fdroid/co.rorystandley.rune.yml and RELEASE.md.
+  # RELEASE.md and docs/reproducibility.md.
   NDK_VERSION: "28.2.13676358"
   # Deterministic packaging: force UTC so any timestamp that does slip through is
   # at least stable across runners.

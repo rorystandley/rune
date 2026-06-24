@@ -18,8 +18,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Pinned build inputs. Keep these in lockstep with docs/fdroid/co.rorystandley.rune.yml
-  # and the table in RELEASE.md.
+  # Pinned build inputs. Keep these in lockstep with the table in RELEASE.md
+  # and docs/reproducibility.md.
   FLUTTER_VERSION: "3.44.2"
   NDK_VERSION: "28.2.13676358"
 
