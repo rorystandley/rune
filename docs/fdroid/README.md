@@ -36,11 +36,11 @@ can only be set once the first real release exists:
    **SHA-256** (the release key, *not* the CI debug fallback). With the published
    APK in hand:
    ```sh
-   apksigner verify --print-certs notes-app-android.apk | grep -i 'SHA-256'
+   apksigner verify --print-certs rune-android.apk | grep -i 'SHA-256'
    # -> use the hex digest, lowercased, with no colons
    ```
 3. **Confirm the `Binaries:` URL resolves** — i.e. the release attaches
-   `notes-app-android.apk` (it does; see `release.yml`). `%v` expands to the
+   `rune-android.apk` (it does; see `release.yml`). `%v` expands to the
    `versionName`.
 
 Until those are filled, the recipe must not be submitted: F-Droid would reject an
@@ -70,7 +70,7 @@ reproducibility against our published binary the way F-Droid's server will:
 # Compare F-Droid's rebuild to the developer-signed APK (signature ignored).
 # apksigcopier is the same tool F-Droid uses; or use our comparator:
 python3 /path/to/rune/tool/reproducibility/compare_apks.py \
-  unsigned/co.rorystandley.rune_1.apk  notes-app-android.apk
+  unsigned/co.rorystandley.rune_1.apk  rune-android.apk
 ```
 
 ## Submit the merge request to fdroiddata

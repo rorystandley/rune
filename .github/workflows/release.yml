@@ -126,12 +126,12 @@ jobs:
         # `reproducibility` workflow; see RELEASE.md and docs/reproducibility.md.
         run: |
           mkdir -p dist
-          ../tool/reproducibility/build_release_apk.sh dist/notes-app-android.apk
+          ../tool/reproducibility/build_release_apk.sh dist/rune-android.apk
           APP_DIR="$(pwd -P)"
           flutter build appbundle --release \
             --android-project-arg=filesystem-roots="$APP_DIR" \
             --android-project-arg=filesystem-scheme=org-dartlang-root
-          cp build/app/outputs/bundle/release/app-release.aab dist/notes-app-android.aab
+          cp build/app/outputs/bundle/release/app-release.aab dist/rune-android.aab
 
       - name: Build Linux
         if: matrix.target == 'linux'
@@ -147,7 +147,7 @@ jobs:
               --owner=0 --group=0 --numeric-owner \
               --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime \
               -C build/linux/x64/release/bundle -cf - . \
-            | gzip -n > dist/notes-app-linux-x64.tar.gz
+            | gzip -n > dist/rune-linux-x64.tar.gz
 
       - name: Build macOS
         if: matrix.target == 'macos'
@@ -222,7 +222,7 @@ jobs:
           mkdir -p dist
           ditto -c -k --sequesterRsrc --keepParent \
             "build/macos/Build/Products/Release/Rune.app" \
-            "dist/notes-app-macos.zip"
+            "dist/rune-macos.zip"
 
       - name: Build iOS (unsigned compile check)
         if: matrix.target == 'ios'
@@ -240,7 +240,7 @@ jobs:
           # zipping so the archive isn't stamped with the build time. (Full Windows
           # build reproducibility is out of scope — see RELEASE.md.)
           find build/windows/x64/runner/Release -exec touch -d "@${SOURCE_DATE_EPOCH}" {} +
-          7z a -tzip dist/notes-app-windows-x64.zip ./build/windows/x64/runner/Release/*
+          7z a -tzip dist/rune-windows-x64.zip ./build/windows/x64/runner/Release/*
 
       - name: Upload artifacts
         if: matrix.target != 'ios'
