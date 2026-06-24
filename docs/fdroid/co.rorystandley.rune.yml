@@ -56,9 +56,9 @@ Builds:
 
 # Reproducible-build verification: compare F-Droid's rebuild against the
 # developer-signed APK published on GitHub Releases.
-Binaries: https://github.com/rorystandley/rune/releases/download/v%v/notes-app-android.apk
+Binaries: https://github.com/rorystandley/rune/releases/download/v%v/rune-android.apk
 # SHA-256 of the release (upload-key) signing certificate, read from the v0.1.0
-# release APK: `apksigner verify --print-certs notes-app-android.apk`.
+# release APK: `apksigner verify --print-certs rune-android.apk`.
 AllowedAPKSigningKeys:
   - 9713bd2fd4a7a6e677d9638dcebb0a718f434f9c62b954008d8c99fe521378ac
 

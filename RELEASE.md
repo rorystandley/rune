@@ -113,7 +113,7 @@ maintainer secrets are involved in producing it. Two independent mechanisms:
 
 Each release attaches the artifacts, `SHA256SUMS`, and
 `SHA256SUMS.cosign.bundle`. To verify a download (replace `<artifact>` with the
-file you downloaded, e.g. `notes-app-linux-x64.tar.gz`):
+file you downloaded, e.g. `rune-linux-x64.tar.gz`):
 
 ```sh
 # 1. Provenance: this artifact was built by rorystandley/rune's release workflow.
@@ -149,7 +149,7 @@ Signs the `.aab`/`.apk` with your upload keystore instead of the debug key.
 
 | Secret | How to produce it |
 |--------|-------------------|
-| `ANDROID_KEYSTORE_BASE64` | `base64 -i ~/keys/notes-app-upload.jks` (macOS) / `base64 -w0 …` (Linux) of the keystore from the [Android](#android-google-play) section. |
+| `ANDROID_KEYSTORE_BASE64` | `base64 -i ~/keys/rune-upload.jks` (macOS) / `base64 -w0 …` (Linux) of the keystore from the [Android](#android-google-play) section. |
 | `ANDROID_STORE_PASSWORD` | The keystore's store password. |
 | `ANDROID_KEY_PASSWORD` | The key's password (often the same as the store password). |
 | `ANDROID_KEY_ALIAS` | The key alias (e.g. `upload`). |
