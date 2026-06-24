@@ -1,0 +1,38 @@
+cmake_minimum_required(VERSION 3.18)
+project(rune_whisper_bridge LANGUAGES C CXX)
+
+if (NOT DEFINED WHISPER_CPP_SOURCE_DIR)
+  message(FATAL_ERROR "Set WHISPER_CPP_SOURCE_DIR to the pinned whisper.cpp checkout.")
+endif()
+
+get_filename_component(WHISPER_CPP_SOURCE_DIR "${WHISPER_CPP_SOURCE_DIR}" ABSOLUTE)
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(WHISPER_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+set(WHISPER_CURL OFF CACHE BOOL "" FORCE)
+set(WHISPER_COREML OFF CACHE BOOL "" FORCE)
+set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+set(GGML_METAL OFF CACHE BOOL "" FORCE)
+set(GGML_CCACHE OFF CACHE BOOL "" FORCE)
+
+add_subdirectory("${WHISPER_CPP_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/whisper.cpp")
+
+add_library(rune_whisper SHARED rune_whisper_bridge.cc)
+target_compile_features(rune_whisper PRIVATE cxx_std_17)
+target_link_libraries(rune_whisper PRIVATE whisper)
+target_include_directories(rune_whisper PRIVATE
+  "${WHISPER_CPP_SOURCE_DIR}/include"
+)
+set_target_properties(rune_whisper PROPERTIES
+  OUTPUT_NAME rune_whisper
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN YES
+  INSTALL_RPATH "@loader_path"
+)

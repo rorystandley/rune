@@ -36,6 +36,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/models/ggml-tiny.en-q5_1.bin
+    - integration_test/fixtures/jfk.wav
 
 # App launcher icons. Source artwork lives in assets/branding/.
 # Regenerate after editing the source: `dart run flutter_launcher_icons`.

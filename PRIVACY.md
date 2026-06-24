@@ -38,10 +38,11 @@ and ships nothing.)
 ## Voice notes
 
 - Recording happens **locally** on your device.
-- Transcription is designed to happen **locally** too (see
-  [docs/transcription.md](docs/transcription.md)). In this build the transcriber
-  is a clearly-labelled stub — it does not send audio anywhere because it does
-  nothing over the network at all.
+- Transcription happens **locally** too (see
+  [docs/transcription.md](docs/transcription.md)). The macOS build uses bundled
+  whisper.cpp and a bundled English model. Platforms whose native engine is not
+  wired yet use a clearly-labelled stub fallback; neither path sends audio over
+  the network.
 - By default, the **raw audio is deleted** as soon as transcription finishes.
   You can opt to keep it.
 

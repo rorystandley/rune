@@ -44,3 +44,9 @@ abstract class TranscriptionService {
 
   Future<TranscriptionResult> transcribe(TranscriptionRequest request);
 }
+
+/// Optional lifecycle hook for transcription engines that own native resources
+/// or worker isolates.
+abstract class DisposableTranscriptionService {
+  void dispose();
+}

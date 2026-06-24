@@ -218,6 +218,10 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     _autoLockTimer?.cancel();
+    final transcription = this.transcription;
+    if (transcription is DisposableTranscriptionService) {
+      (transcription as DisposableTranscriptionService).dispose();
+    }
     super.dispose();
   }
 }
