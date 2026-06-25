@@ -15,6 +15,15 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
+val repoRootDir = rootProject.file("../..").canonicalFile
+val whisperCppSourceDir = repoRootDir.resolve("third_party/whisper.cpp")
+val whisperReproducibleCompileFlags =
+    listOf(
+        "-ffile-prefix-map=${whisperCppSourceDir.absolutePath}=third_party/whisper.cpp",
+        "-ffile-prefix-map=${repoRootDir.absolutePath}=.",
+        "-no-canonical-prefixes",
+    ).joinToString(" ")
+
 android {
     namespace = "co.rorystandley.notes_app"
     compileSdk = flutter.compileSdkVersion
@@ -47,6 +56,25 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        externalNativeBuild {
+            cmake {
+                cppFlags.add("-std=c++17")
+                arguments.addAll(
+                    listOf(
+                        "-DWHISPER_CPP_SOURCE_DIR=${whisperCppSourceDir.absolutePath}",
+                        "-DANDROID_STL=c++_shared",
+                        "-DCMAKE_C_FLAGS=$whisperReproducibleCompileFlags",
+                        "-DCMAKE_CXX_FLAGS=$whisperReproducibleCompileFlags",
+                        "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,--build-id=none",
+                    ),
+                )
+            }
+        }
+
+        ndk {
+            abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64"))
+        }
     }
 
     signingConfigs {
@@ -77,6 +105,12 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("../../../native/whisper/CMakeLists.txt")
         }
     }
 }

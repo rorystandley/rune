@@ -13,19 +13,21 @@ if ! command -v cmake >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ -d "$SOURCE_DIR/.git" ]; then
-  actual_commit="$(git -C "$SOURCE_DIR" rev-parse HEAD)"
-  if [ "$actual_commit" != "$WHISPER_CPP_COMMIT" ]; then
-    echo "error: $SOURCE_DIR is at $actual_commit, expected $WHISPER_CPP_COMMIT." >&2
-    exit 1
-  fi
-else
-  SOURCE_DIR="$APP_DIR/build/whisper/src/whisper.cpp"
-  if [ ! -d "$SOURCE_DIR/.git" ]; then
-    git clone https://github.com/ggml-org/whisper.cpp.git "$SOURCE_DIR"
-  fi
-  git -C "$SOURCE_DIR" fetch --depth 1 origin "$WHISPER_CPP_COMMIT"
-  git -C "$SOURCE_DIR" checkout --detach "$WHISPER_CPP_COMMIT"
+if [ ! -d "$SOURCE_DIR" ]; then
+  echo "error: missing whisper.cpp checkout at $SOURCE_DIR." >&2
+  echo "Run 'git submodule update --init --recursive third_party/whisper.cpp'." >&2
+  exit 1
+fi
+
+if ! git -C "$SOURCE_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  echo "error: $SOURCE_DIR is not a git checkout." >&2
+  exit 1
+fi
+
+actual_commit="$(git -C "$SOURCE_DIR" rev-parse HEAD)"
+if [ "$actual_commit" != "$WHISPER_CPP_COMMIT" ]; then
+  echo "error: $SOURCE_DIR is at $actual_commit, expected $WHISPER_CPP_COMMIT." >&2
+  exit 1
 fi
 
 CONFIG="${CONFIGURATION:-Release}"

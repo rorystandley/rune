@@ -20,8 +20,13 @@ put a cloud or remote API behind this interface.
 - macOS uses `WhisperTranscriptionService`, a Dart FFI service backed by a small
   native bridge around whisper.cpp. Recording already produces 16 kHz mono WAV,
   and the service decodes that PCM16 WAV directly into `Float32List` samples.
-- Android and iOS still fall back to `StubTranscriptionService` until their
-  native build/linking PRs land.
+- Android builds and bundles the same native bridge as `librune_whisper.so` for
+  `arm64-v8a`, `armeabi-v7a`, and `x86_64`. It uses the whisper service when
+  the bundled library and model are available, then falls back to
+  `StubTranscriptionService` if native loading fails. Physical-device
+  verification is still pending.
+- iOS still falls back to `StubTranscriptionService` until its native
+  build/linking PR lands.
 - Windows and Linux intentionally keep `StubTranscriptionService`.
 
 The app factory is `app/lib/platform/transcription_factory.dart`. It copies the
@@ -42,20 +47,46 @@ because native whisper.cpp needs a real file path, not an asset URI.
   is an OpenAI Whisper model converted to ggml format; the Hugging Face model
   repo is marked MIT, and OpenAI documents Whisper code and weights as MIT.
 
+## Native source
+
+The pinned whisper.cpp source is a git submodule at `third_party/whisper.cpp`.
+Initialize it before native builds:
+
+```bash
+git submodule update --init --recursive third_party/whisper.cpp
+```
+
+The native bridge lives in `native/whisper/rune_whisper_bridge.cc`; the shared
+CMake project in `native/whisper/CMakeLists.txt` builds it against the pinned
+whisper.cpp checkout for every supported native target.
+
 ## macOS build
 
 The macOS Xcode project runs `tool/whisper/build_macos.sh` as a build phase. The
-script:
-
-1. Uses `third_party/whisper.cpp` if it exists and is exactly at the pinned
-   commit.
-2. Otherwise fetches the pinned commit into `app/build/whisper/src/whisper.cpp`.
-3. Builds `native/whisper/rune_whisper_bridge.cc` and whisper.cpp from source
-   with CMake.
-4. Copies `librune_whisper.dylib` into the app bundle's `Contents/Frameworks`.
+script validates that `third_party/whisper.cpp` is exactly at the pinned commit,
+builds `native/whisper/rune_whisper_bridge.cc` and whisper.cpp from source with
+CMake, then copies `librune_whisper.dylib` into the app bundle's
+`Contents/Frameworks`.
 
 Install `cmake` before building the macOS app locally. No prebuilt native
 library is committed.
+
+## Android build
+
+The Android Gradle project uses `externalNativeBuild` to run the shared CMake
+project during `flutter build apk`. The release APK remains a single universal
+APK; Gradle packages `lib/<abi>/librune_whisper.so` for `arm64-v8a`,
+`armeabi-v7a`, and `x86_64`.
+
+For local native-only builds outside Gradle:
+
+```bash
+tool/whisper/build_android.sh
+```
+
+Android release builds pass `-ffile-prefix-map` and `-no-canonical-prefixes` to
+the native compiler, plus `-Wl,--build-id=none` to the linker, so whisper.cpp
+does not embed checkout-specific absolute paths or GNU build-ids in the APK.
 
 ## Tests
 
@@ -66,8 +97,8 @@ CI-safe tests cover:
 - Graceful unavailability when the model/native library is absent.
 
 The real native transcription path is represented by a skipped integration test
-in `app/integration_test/whisper_transcription_test.dart`. To run it manually,
-build the native bridge, then provide:
+in `app/integration_test/whisper_transcription_test.dart`. To run it manually on
+macOS, build the native bridge, then provide:
 
 ```bash
 RUNE_RUN_WHISPER_TEST=1 \
@@ -75,13 +106,17 @@ RUNE_WHISPER_LIBRARY="$PWD/build/macos/Build/Products/Debug/Rune.app/Contents/Fr
 flutter test integration_test/whisper_transcription_test.dart
 ```
 
+To run the same gated test on a connected Android device or emulator:
+
+```bash
+RUNE_RUN_WHISPER_TEST=1 \
+flutter test -d <android-device-id> integration_test/whisper_transcription_test.dart
+```
+
 Only claim a platform works after that platform has transcribed a real WAV.
 
 ## Follow-ups
 
-- Android: add the NDK/CMake build for `arm64-v8a`, `armeabi-v7a`, and `x86_64`,
-  bundle the `.so`, and extend `tool/reproducibility/build_release_apk.sh` so
-  whisper's native library stays deterministic.
 - iOS: build a static library or xcframework and load it with
   `DynamicLibrary.process()`.
 - F-Droid: update the separate fdroiddata recipe for the NDK build and bundled

@@ -9,7 +9,9 @@ const String _whisperModelAsset = 'assets/models/ggml-tiny.en-q5_1.bin';
 const String _whisperModelFileName = 'ggml-tiny.en-q5_1.bin';
 
 Future<TranscriptionService> resolveTranscriptionService(AppPaths paths) async {
-  if (!Platform.isMacOS) return const StubTranscriptionService();
+  if (!Platform.isMacOS && !Platform.isAndroid) {
+    return const StubTranscriptionService();
+  }
 
   final model = await _copyBundledWhisperModel(paths);
   final service = WhisperTranscriptionService(modelPath: model.path);

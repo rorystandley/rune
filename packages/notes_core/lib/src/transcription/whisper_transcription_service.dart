@@ -10,6 +10,7 @@ import 'transcription_service.dart';
 import 'wav_decoder.dart';
 
 const String _macosLibraryName = 'librune_whisper.dylib';
+const String _androidLibraryName = 'librune_whisper.so';
 
 typedef WhisperLibraryPathResolver = String Function();
 
@@ -17,6 +18,8 @@ typedef WhisperLibraryPathResolver = String Function();
 String defaultWhisperLibraryPath() {
   final override = Platform.environment['RUNE_WHISPER_LIBRARY'];
   if (override != null && override.isNotEmpty) return override;
+
+  if (Platform.isAndroid) return _androidLibraryName;
 
   if (Platform.isMacOS) {
     final executable = File(Platform.resolvedExecutable);
