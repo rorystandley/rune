@@ -11,7 +11,12 @@
 #if defined(_WIN32)
 #define RUNE_WHISPER_EXPORT __declspec(dllexport)
 #else
-#define RUNE_WHISPER_EXPORT __attribute__((visibility("default")))
+// `used` keeps these FFI entry points out of the linker's dead-strip: on iOS the
+// bridge is a static archive linked into the app binary and nothing references
+// the symbols at link time (they're only reached via DynamicLibrary.process()
+// at runtime), so without `used` a release build (-dead_strip) drops them and
+// transcription silently falls back to the stub. Harmless on macOS/Android.
+#define RUNE_WHISPER_EXPORT __attribute__((visibility("default"), used))
 #endif
 
 struct RuneWhisperContext {
