@@ -28,8 +28,9 @@ put a cloud or remote API behind this interface.
   test transcribes the bundled JFK sample with the expected words.
 - iOS builds the same bridge into a static `librune_whisper.a`, force-loads it
   into the Runner binary, and resolves FFI symbols with
-  `DynamicLibrary.process()`. This wiring is implemented; physical-device
-  transcription verification is pending.
+  `DynamicLibrary.process()`. Verified on the iOS Simulator (arm64): the gated
+  integration test transcribes the bundled JFK sample with the expected words;
+  a physical-device run is still pending.
 - Windows and Linux intentionally keep `StubTranscriptionService`.
 
 The app factory is `app/lib/platform/transcription_factory.dart`. It copies the
