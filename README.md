@@ -12,9 +12,8 @@ network calls at all**.
 > **Status: working MVP.** Core vault engine, encryption, notes CRUD, search,
 > auto-lock, backup/export, and the voice-note flow are implemented and tested.
 > On-device speech-to-text is implemented for macOS, Android, and iOS via
-> whisper.cpp (Android verified on a physical device; iOS verified on the
-> Simulator, physical-device run pending), with stub fallback still used on
-> Windows and Linux
+> whisper.cpp (Android and iOS verified on physical devices), with stub
+> fallback still used on Windows and Linux
 > (see [Voice transcription](#voice-transcription)). This is not audited
 > software — see [SECURITY.md](SECURITY.md) for honest limitations.
 
@@ -203,8 +202,8 @@ the security tests pass publicly on each commit (see the CI badge above).
   whisper.cpp bridge and uses it on device — verified on a Samsung Galaxy A53
   (Android 15, arm64) transcribing the bundled JFK sample. iOS links the bridge
   as a force-loaded static library and resolves it with `DynamicLibrary.process()`,
-  verified on the iOS Simulator (arm64) transcribing the bundled JFK sample; a
-  physical-device run is still pending. Windows and Linux keep
+  verified on a physical iPhone (iOS 26, arm64) transcribing a real recording.
+  Windows and Linux keep
   `StubTranscriptionService`; see [docs/transcription.md](docs/transcription.md).
 
 ### Not done yet (see [ROADMAP.md](ROADMAP.md))
