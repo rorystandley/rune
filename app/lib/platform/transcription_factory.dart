@@ -9,7 +9,7 @@ const String _whisperModelAsset = 'assets/models/ggml-tiny.en-q5_1.bin';
 const String _whisperModelFileName = 'ggml-tiny.en-q5_1.bin';
 
 Future<TranscriptionService> resolveTranscriptionService(AppPaths paths) async {
-  if (!Platform.isMacOS && !Platform.isAndroid) {
+  if (!Platform.isMacOS && !Platform.isAndroid && !Platform.isIOS) {
     return const StubTranscriptionService();
   }
 

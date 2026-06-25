@@ -16,6 +16,8 @@ typedef WhisperLibraryPathResolver = String Function();
 
 /// Returns the expected runtime path for the bundled whisper bridge library.
 String defaultWhisperLibraryPath() {
+  if (Platform.isIOS) return '';
+
   final override = Platform.environment['RUNE_WHISPER_LIBRARY'];
   if (override != null && override.isNotEmpty) return override;
 
@@ -139,8 +141,14 @@ class WhisperTranscriptionService
 }
 
 bool _canOpenWhisperLibrary(String libraryPath) {
-  final bindings = _RuneWhisperBindings(DynamicLibrary.open(libraryPath));
+  final bindings = _RuneWhisperBindings(_openWhisperLibrary(libraryPath));
   return bindings.version().toDartString().isNotEmpty;
+}
+
+DynamicLibrary _openWhisperLibrary(String libraryPath) {
+  return Platform.isIOS
+      ? DynamicLibrary.process()
+      : DynamicLibrary.open(libraryPath);
 }
 
 class _WhisperWorkerClient {
@@ -262,7 +270,7 @@ void _whisperWorkerEntry(_WhisperWorkerStart start) {
   Pointer<Void> handle = nullptr;
 
   try {
-    bindings = _RuneWhisperBindings(DynamicLibrary.open(start.libraryPath));
+    bindings = _RuneWhisperBindings(_openWhisperLibrary(start.libraryPath));
     final modelPath = start.modelPath.toNativeUtf8();
     try {
       handle = bindings.create(modelPath);

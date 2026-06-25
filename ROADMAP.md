@@ -32,11 +32,11 @@ honestly private" to "would survive scrutiny on r/privacy".
    per-blob nonce scheme, stored as separate AEAD blobs — keeping the
    "only ciphertext on disk" invariant.
 
-7. **Real on-device transcription on every target.** macOS and Android now use
-   whisper.cpp via FFI with a bundled quantized English model and an
-   off-UI-isolate worker (Android verified on a physical device).
-   iOS still needs its native build/linking PR, and Windows/Linux keep the stub
-   by design. See `docs/transcription.md`.
+7. **Real on-device transcription on every target.** macOS, Android, and iOS
+   now use whisper.cpp via FFI with a bundled quantized English model and an
+   off-UI-isolate worker. Android is verified on a physical device; iOS native
+   build/linking is implemented and pending physical-device verification.
+   Windows/Linux keep the stub by design. See `docs/transcription.md`.
 
 8. **Native file picker / share sheet for exports** (`file_picker`,
    `share_plus`) so users choose where backups go, plus **encrypted-backup

@@ -23,9 +23,17 @@ set(GGML_METAL OFF CACHE BOOL "" FORCE)
 set(GGML_CCACHE OFF CACHE BOOL "" FORCE)
 set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
 
+if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  set(RUNE_WHISPER_LIBRARY_TYPE STATIC)
+  set(GGML_BLAS OFF CACHE BOOL "" FORCE)
+  set(GGML_ACCELERATE OFF CACHE BOOL "" FORCE)
+else()
+  set(RUNE_WHISPER_LIBRARY_TYPE SHARED)
+endif()
+
 add_subdirectory("${WHISPER_CPP_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/whisper.cpp")
 
-add_library(rune_whisper SHARED rune_whisper_bridge.cc)
+add_library(rune_whisper ${RUNE_WHISPER_LIBRARY_TYPE} rune_whisper_bridge.cc)
 target_compile_features(rune_whisper PRIVATE cxx_std_17)
 target_link_libraries(rune_whisper PRIVATE whisper)
 target_include_directories(rune_whisper PRIVATE

@@ -200,6 +200,7 @@
 			buildPhases = (
 				EBAA5396654C79FAC2B6FD53 /* [CP] Check Pods Manifest.lock */,
 				9740EEB61CF901F6004384FC /* Run Script */,
+				4B9C4A922D7C4F4DA3E1B902 /* Build whisper.cpp */,
 				97C146EA1CF9000F007C117D /* Sources */,
 				97C146EB1CF9000F007C117D /* Frameworks */,
 				97C146EC1CF9000F007C117D /* Resources */,
@@ -312,6 +313,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
+		};
+		4B9C4A922D7C4F4DA3E1B902 /* Build whisper.cpp */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${SRCROOT}/../../native/whisper/rune_whisper_bridge.cc",
+				"${SRCROOT}/../../native/whisper/CMakeLists.txt",
+				"${SRCROOT}/../../tool/whisper/build_ios.sh",
+			);
+			name = "Build whisper.cpp";
+			outputPaths = (
+				"${PROJECT_DIR}/../build/whisper/ios/${CONFIGURATION}${EFFECTIVE_PLATFORM_NAME}/librune_whisper.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/../../tool/whisper/build_ios.sh\"\n";
 		};
 		EBAA5396654C79FAC2B6FD53 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -473,6 +492,12 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-force_load",
+					"$(PROJECT_DIR)/../build/whisper/ios/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/librune_whisper.a",
+					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = co.rorystandley.rune;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -657,6 +682,12 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-force_load",
+					"$(PROJECT_DIR)/../build/whisper/ios/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/librune_whisper.a",
+					"-lc++",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = co.rorystandley.rune;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -679,6 +710,12 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-force_load",
+					"$(PROJECT_DIR)/../build/whisper/ios/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/librune_whisper.a",
+					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = co.rorystandley.rune;
 				PRODUCT_NAME = "$(TARGET_NAME)";
