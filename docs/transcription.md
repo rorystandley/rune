@@ -28,9 +28,11 @@ put a cloud or remote API behind this interface.
   test transcribes the bundled JFK sample with the expected words.
 - iOS builds the same bridge into a static `librune_whisper.a`, force-loads it
   into the Runner binary, and resolves FFI symbols with
-  `DynamicLibrary.process()`. Verified on the iOS Simulator (arm64): the gated
-  integration test transcribes the bundled JFK sample with the expected words;
-  a physical-device run is still pending.
+  `DynamicLibrary.process()`. The exported functions are marked
+  `__attribute__((used))` so a release `-dead_strip` keeps them (without it a
+  release build silently falls back to the stub). Verified on the iOS Simulator
+  (gated integration test, JFK sample) and on a physical iPhone (real recording,
+  release build).
 - Windows and Linux intentionally keep `StubTranscriptionService`.
 
 The app factory is `app/lib/platform/transcription_factory.dart`. It copies the
@@ -146,16 +148,29 @@ The native library is bundled in the APK, so no `RUNE_WHISPER_LIBRARY` override
 is needed. A debug-built engine is slow on mobile CPUs (the gated test allows
 several minutes); release builds are far faster.
 
-To run the same gated test on a connected iPhone or iOS simulator:
+To run the same gated test on the iOS **Simulator** (no signing needed):
 
 ```bash
-flutter test -d <iphone-id> \
+flutter test -d <simulator-id> \
   --dart-define=RUNE_RUN_WHISPER_TEST=true \
   integration_test/whisper_transcription_test.dart
 ```
 
-The expected on-device result is `isStub == false` and a transcript containing
-`ask not` and `country`.
+The expected result is `isStub == false` and a transcript containing `ask not`
+and `country`.
+
+On a **physical iPhone**, `flutter test` currently stalls on "Dart VM Service
+was not discovered" — its integration-test harness can't tunnel to the device
+(wireless additionally needs an unsupported `--publish-port`). Verify the device
+instead with a real recording in a release build, which needs no VM service:
+
+```bash
+flutter run --release -d <iphone-id>   # set DEVELOPMENT_TEAM for signing
+# then record a voice note in the app and confirm the transcript appears
+```
+
+Note the release-build requirement: a debug build won't catch the
+`-dead_strip` symbol issue, so always confirm iOS on a release build.
 
 Only claim a platform works after that platform has transcribed a real WAV.
 
