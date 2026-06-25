@@ -29,6 +29,14 @@ void main() {
     expect(decoded.single, closeTo(1024 / 32768, 0.000001));
   });
 
+  test('decodes WAVE_FORMAT_EXTENSIBLE recordings (macOS record output)', () {
+    final decoded = decodePcm16MonoWav(_wav([0, 16384], extensible: true));
+
+    expect(decoded, hasLength(2));
+    expect(decoded[0], 0.0);
+    expect(decoded[1], 0.5);
+  });
+
   test('rejects audio that does not match the recorder format', () {
     expect(
       () => decodePcm16MonoWav(_wav([0], sampleRate: 8000)),
@@ -41,6 +49,7 @@ Uint8List _wav(
   List<int> samples, {
   int sampleRate = 16000,
   bool includeOddJunk = false,
+  bool extensible = false,
 }) {
   final bytes = BytesBuilder();
 
@@ -62,8 +71,9 @@ Uint8List _wav(
   }
 
   final junkSize = includeOddJunk ? 2 + 8 : 0;
+  final fmtBodySize = extensible ? 40 : 16;
   final dataSize = samples.length * 2;
-  final riffSize = 4 + junkSize + 24 + 8 + dataSize;
+  final riffSize = 4 + junkSize + (8 + fmtBodySize) + 8 + dataSize;
 
   addAscii('RIFF');
   addUint32(riffSize);
@@ -77,13 +87,23 @@ Uint8List _wav(
   }
 
   addAscii('fmt ');
-  addUint32(16);
-  addUint16(1); // PCM
+  addUint32(fmtBodySize);
+  addUint16(extensible ? 0xFFFE : 1); // WAVE_FORMAT_EXTENSIBLE or PCM
   addUint16(1); // mono
   addUint32(sampleRate);
   addUint32(sampleRate * 2);
   addUint16(2);
   addUint16(16);
+  if (extensible) {
+    addUint16(22); // cbSize
+    addUint16(16); // wValidBitsPerSample
+    addUint32(0); // dwChannelMask
+    // KSDATAFORMAT_SUBTYPE_PCM: {00000001-0000-0010-8000-00AA00389B71}
+    bytes.add(Uint8List.fromList(const [
+      0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, //
+      0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71,
+    ]));
+  }
 
   addAscii('data');
   addUint32(dataSize);

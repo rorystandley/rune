@@ -6,6 +6,7 @@ const int _wave = 0x45564157; // WAVE
 const int _fmt = 0x20746d66; // fmt[space]
 const int _data = 0x61746164; // data
 const int _pcmFormat = 1;
+const int _extensibleFormat = 0xFFFE; // WAVE_FORMAT_EXTENSIBLE
 
 /// Decodes a 16 kHz mono PCM16 WAV file into normalized float samples.
 Float32List decodePcm16MonoWavFile(String path) =>
@@ -53,6 +54,15 @@ Float32List decodePcm16MonoWav(Uint8List bytes) {
       byteRate = data.getUint32(chunkDataOffset + 8, Endian.little);
       blockAlign = data.getUint16(chunkDataOffset + 12, Endian.little);
       bitsPerSample = data.getUint16(chunkDataOffset + 14, Endian.little);
+      // WAVE_FORMAT_EXTENSIBLE (e.g. macOS `record`) wraps the real sample
+      // format in a 16-byte SubFormat GUID whose first two bytes hold the
+      // actual format tag (PCM = 1). Unwrap it so the checks below still apply.
+      if (audioFormat == _extensibleFormat) {
+        if (chunkSize < 40) {
+          throw const FormatException('WAV extensible fmt chunk is too short.');
+        }
+        audioFormat = data.getUint16(chunkDataOffset + 24, Endian.little);
+      }
     } else if (chunkId == _data) {
       dataOffset = chunkDataOffset;
       dataLength = chunkSize;
