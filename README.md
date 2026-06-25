@@ -11,9 +11,10 @@ network calls at all**.
 
 > **Status: working MVP.** Core vault engine, encryption, notes CRUD, search,
 > auto-lock, backup/export, and the voice-note flow are implemented and tested.
-> On-device speech-to-text is implemented for macOS and Android via
-> whisper.cpp (Android verified on a physical device), with stub fallback still
-> used on the remaining platforms while their native builds land
+> On-device speech-to-text is implemented for macOS, Android, and iOS via
+> whisper.cpp (Android verified on a physical device; iOS verified on the
+> Simulator, physical-device run pending), with stub fallback still used on
+> Windows and Linux
 > (see [Voice transcription](#voice-transcription)). This is not audited
 > software — see [SECURITY.md](SECURITY.md) for honest limitations.
 
@@ -113,8 +114,8 @@ Only ciphertext is ever written for note content. Writes are atomic
 ### Get the source
 
 This repo vendors whisper.cpp as a git submodule for the on-device transcription
-native build (macOS/Android). Clone with submodules, or initialise them after a
-plain clone:
+native build (macOS/Android/iOS). Clone with submodules, or initialise them
+after a plain clone:
 
 ```bash
 git clone --recurse-submodules https://github.com/rorystandley/rune.git
@@ -200,10 +201,11 @@ the security tests pass publicly on each commit (see the CI badge above).
   WAV). On macOS, transcription runs locally through whisper.cpp via Dart FFI
   with a bundled quantized English model. Android builds and bundles the same
   whisper.cpp bridge and uses it on device — verified on a Samsung Galaxy A53
-  (Android 15, arm64) transcribing the bundled JFK sample. iOS, Windows, and
-  Linux still use
-  `StubTranscriptionService` until their platform-specific native builds land;
-  see [docs/transcription.md](docs/transcription.md).
+  (Android 15, arm64) transcribing the bundled JFK sample. iOS links the bridge
+  as a force-loaded static library and resolves it with `DynamicLibrary.process()`,
+  verified on the iOS Simulator (arm64) transcribing the bundled JFK sample; a
+  physical-device run is still pending. Windows and Linux keep
+  `StubTranscriptionService`; see [docs/transcription.md](docs/transcription.md).
 
 ### Not done yet (see [ROADMAP.md](ROADMAP.md))
 - Native file picker / share sheet for exports (currently saved to a documented

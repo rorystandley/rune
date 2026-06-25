@@ -26,8 +26,11 @@ put a cloud or remote API behind this interface.
   `StubTranscriptionService` if native loading fails. Verified on a physical
   device (Samsung Galaxy A53, Android 15 / arm64-v8a): the gated integration
   test transcribes the bundled JFK sample with the expected words.
-- iOS still falls back to `StubTranscriptionService` until its native
-  build/linking PR lands.
+- iOS builds the same bridge into a static `librune_whisper.a`, force-loads it
+  into the Runner binary, and resolves FFI symbols with
+  `DynamicLibrary.process()`. Verified on the iOS Simulator (arm64): the gated
+  integration test transcribes the bundled JFK sample with the expected words;
+  a physical-device run is still pending.
 - Windows and Linux intentionally keep `StubTranscriptionService`.
 
 The app factory is `app/lib/platform/transcription_factory.dart`. It copies the
@@ -59,7 +62,8 @@ git submodule update --init --recursive third_party/whisper.cpp
 
 The native bridge lives in `native/whisper/rune_whisper_bridge.cc`; the shared
 CMake project in `native/whisper/CMakeLists.txt` builds it against the pinned
-whisper.cpp checkout for every supported native target.
+whisper.cpp checkout for every supported native target. macOS and Android build
+shared libraries, while iOS builds a static archive for the app binary.
 
 ## macOS build
 
@@ -88,6 +92,27 @@ tool/whisper/build_android.sh
 Android release builds pass `-ffile-prefix-map` and `-no-canonical-prefixes` to
 the native compiler, plus `-Wl,--build-id=none` to the linker, so whisper.cpp
 does not embed checkout-specific absolute paths or GNU build-ids in the APK.
+
+## iOS build
+
+iOS cannot load an arbitrary app-bundled dynamic library with `dlopen` in the
+same way macOS and Android can. Instead, the Runner Xcode target runs
+`tool/whisper/build_ios.sh` before linking. The script validates the pinned
+whisper.cpp submodule, configures CMake for iOS (`CMAKE_SYSTEM_NAME=iOS`,
+`arm64`, and the active `iphoneos` or `iphonesimulator` SDK), builds the static
+whisper.cpp/ggml/bridge libraries, and combines them with `libtool -static`
+into:
+
+```text
+app/build/whisper/ios/<Configuration><EffectivePlatformName>/librune_whisper.a
+```
+
+Runner links that archive with `-force_load` in `OTHER_LDFLAGS`. This is
+required because the `rune_whisper_*` C symbols are reached only through Dart
+FFI lookups at runtime; without `-force_load`, the linker can dead-strip them
+from the static archive. The Dart loader therefore uses
+`DynamicLibrary.process()` on iOS, and the `RUNE_WHISPER_LIBRARY` path is unused
+there.
 
 ## Tests
 
@@ -121,11 +146,20 @@ The native library is bundled in the APK, so no `RUNE_WHISPER_LIBRARY` override
 is needed. A debug-built engine is slow on mobile CPUs (the gated test allows
 several minutes); release builds are far faster.
 
+To run the same gated test on a connected iPhone or iOS simulator:
+
+```bash
+flutter test -d <iphone-id> \
+  --dart-define=RUNE_RUN_WHISPER_TEST=true \
+  integration_test/whisper_transcription_test.dart
+```
+
+The expected on-device result is `isStub == false` and a transcript containing
+`ask not` and `country`.
+
 Only claim a platform works after that platform has transcribed a real WAV.
 
 ## Follow-ups
 
-- iOS: build a static library or xcframework and load it with
-  `DynamicLibrary.process()`.
 - F-Droid: update the separate fdroiddata recipe for the NDK build and bundled
   MIT-licensed model asset.
