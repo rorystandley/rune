@@ -23,8 +23,9 @@ put a cloud or remote API behind this interface.
 - Android builds and bundles the same native bridge as `librune_whisper.so` for
   `arm64-v8a`, `armeabi-v7a`, and `x86_64`. It uses the whisper service when
   the bundled library and model are available, then falls back to
-  `StubTranscriptionService` if native loading fails. Physical-device
-  verification is still pending.
+  `StubTranscriptionService` if native loading fails. Verified on a physical
+  device (Samsung Galaxy A53, Android 15 / arm64-v8a): the gated integration
+  test transcribes the bundled JFK sample with the expected words.
 - iOS still falls back to `StubTranscriptionService` until its native
   build/linking PR lands.
 - Windows and Linux intentionally keep `StubTranscriptionService`.
@@ -106,12 +107,19 @@ RUNE_WHISPER_LIBRARY="$PWD/build/macos/Build/Products/Debug/Rune.app/Contents/Fr
 flutter test integration_test/whisper_transcription_test.dart
 ```
 
-To run the same gated test on a connected Android device or emulator:
+To run the same gated test on a connected Android device or emulator, pass the
+flag as a `--dart-define` — on-device test processes do not inherit the host
+environment, so the `RUNE_RUN_WHISPER_TEST` env var alone would skip the test:
 
 ```bash
-RUNE_RUN_WHISPER_TEST=1 \
-flutter test -d <android-device-id> integration_test/whisper_transcription_test.dart
+flutter test -d <android-device-id> \
+  --dart-define=RUNE_RUN_WHISPER_TEST=true \
+  integration_test/whisper_transcription_test.dart
 ```
+
+The native library is bundled in the APK, so no `RUNE_WHISPER_LIBRARY` override
+is needed. A debug-built engine is slow on mobile CPUs (the gated test allows
+several minutes); release builds are far faster.
 
 Only claim a platform works after that platform has transcribed a real WAV.
 

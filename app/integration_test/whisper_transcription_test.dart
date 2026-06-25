@@ -27,10 +27,17 @@ void main() {
       expect(result.text.toLowerCase(), contains('ask not'));
       expect(result.text.toLowerCase(), contains('country'));
     },
-    skip: Platform.environment['RUNE_RUN_WHISPER_TEST'] == '1'
+    // Host runs (macOS) pass the flag via the process environment; on-device
+    // runs (Android/iOS) don't inherit the host env, so also honour a
+    // compile-time --dart-define=RUNE_RUN_WHISPER_TEST=true.
+    skip: (Platform.environment['RUNE_RUN_WHISPER_TEST'] == '1' ||
+            const bool.fromEnvironment('RUNE_RUN_WHISPER_TEST'))
         ? false
         : 'Requires local whisper.cpp native library and bundled model.',
     tags: const ['whisper'],
+    // Debug-built native whisper.cpp is unoptimised and slow on mobile CPUs;
+    // release builds are far faster. Allow ample time for the opt-in run.
+    timeout: const Timeout(Duration(minutes: 5)),
   );
 }
 
