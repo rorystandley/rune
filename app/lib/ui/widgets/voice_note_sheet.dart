@@ -7,24 +7,35 @@ import 'package:notes_core/notes_core.dart';
 import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 
-/// Opens the voice-note flow: record locally → transcribe locally → insert into
-/// a new note → delete the raw audio by default. Returns the new note's id if
-/// one was created.
-Future<void> showVoiceNoteSheet(BuildContext context) {
+/// Opens the voice-note flow: record locally → transcribe locally → delete the
+/// raw audio by default.
+///
+/// When [onTranscribed] is given (the editor's mic), the transcript is inserted
+/// into the open note via that callback. Otherwise (the home/sidebar mic) a new
+/// note is created from the transcript.
+Future<void> showVoiceNoteSheet(
+  BuildContext context, {
+  ValueChanged<String>? onTranscribed,
+}) {
   final controller = AppScope.of(context);
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (_) => _VoiceNoteSheet(controller: controller),
+    builder: (_) =>
+        _VoiceNoteSheet(controller: controller, onTranscribed: onTranscribed),
   );
 }
 
 enum _Stage { checking, unsupported, idle, recording, transcribing, failed }
 
 class _VoiceNoteSheet extends StatefulWidget {
-  const _VoiceNoteSheet({required this.controller});
+  const _VoiceNoteSheet({required this.controller, this.onTranscribed});
 
   final AppController controller;
+
+  /// When set, the transcript is handed here (insert into the open note)
+  /// instead of creating a new note.
+  final ValueChanged<String>? onTranscribed;
 
   @override
   State<_VoiceNoteSheet> createState() => _VoiceNoteSheetState();
@@ -86,13 +97,20 @@ class _VoiceNoteSheetState extends State<_VoiceNoteSheet> {
     setState(() => _stage = _Stage.transcribing);
     final recordedPath = await _c.recorder.stop() ?? _audioPath;
 
+    final appended = widget.onTranscribed != null;
     var inserted = false;
+    var wasStub = false;
     try {
       final result = await _c.transcription.transcribe(
         TranscriptionRequest(audioFilePath: recordedPath ?? '', languageHint: 'en'),
       );
-      final note = await _c.newNote();
-      await _c.saveNote(note.id, title: 'Voice note', body: result.text);
+      wasStub = result.isStub;
+      if (widget.onTranscribed != null) {
+        widget.onTranscribed!(result.text);
+      } else {
+        final note = await _c.newNote();
+        await _c.saveNote(note.id, title: 'Voice note', body: result.text);
+      }
       inserted = true;
 
       if (!_keepAudio && recordedPath != null) {
@@ -103,16 +121,20 @@ class _VoiceNoteSheetState extends State<_VoiceNoteSheet> {
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(inserted
-                ? (_keepAudio
-                    ? 'Voice note added. Audio kept locally.'
-                    : 'Voice note added. Audio discarded.')
-                : 'Could not create the voice note.'),
-          ),
+          SnackBar(content: Text(_resultMessage(inserted, appended, wasStub))),
         );
       }
     }
+  }
+
+  String _resultMessage(bool inserted, bool appended, bool wasStub) {
+    if (!inserted) return 'Could not add the voice note.';
+    final where = appended ? 'Added to note.' : 'Voice note added.';
+    if (wasStub) {
+      return '$where Placeholder transcription — no on-device speech-to-text '
+          'on this platform yet.';
+    }
+    return '$where ${_keepAudio ? 'Audio kept locally.' : 'Audio discarded.'}';
   }
 
   @override
@@ -179,7 +201,6 @@ class _VoiceNoteSheetState extends State<_VoiceNoteSheet> {
           ),
           const SizedBox(height: 8),
           _keepAudioToggle(),
-          _stubNotice(theme),
         ];
       case _Stage.recording:
         return [
@@ -220,15 +241,6 @@ class _VoiceNoteSheetState extends State<_VoiceNoteSheet> {
         onChanged: (v) => setState(() => _keepAudio = v),
         title: const Text('Keep audio recording'),
         subtitle: const Text('Off = delete the audio after transcription'),
-      );
-
-  Widget _stubNotice(ThemeData theme) => Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Text(
-          'Note: transcription uses a placeholder in this build. '
-          'See docs/transcription.md to enable on-device whisper.cpp.',
-          style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-        ),
       );
 
   Widget _info(ThemeData theme, IconData icon, String text) => Row(
