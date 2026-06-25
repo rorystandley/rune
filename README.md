@@ -110,6 +110,21 @@ Only ciphertext is ever written for note content. Writes are atomic
   macOS/iOS, Android SDK for Android, GTK/CMake for Linux, Visual Studio for
   Windows). **None of these are needed to run the tests.**
 
+### Get the source
+
+This repo vendors whisper.cpp as a git submodule for the on-device transcription
+native build (macOS/Android). Clone with submodules, or initialise them after a
+plain clone:
+
+```bash
+git clone --recurse-submodules https://github.com/rorystandley/rune.git
+# or, after a plain clone:
+git submodule update --init --recursive
+```
+
+The submodule is only needed to build the native transcription library; the test
+suite and `flutter analyze` run without it.
+
 ### Get dependencies
 
 ```bash
