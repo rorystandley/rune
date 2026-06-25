@@ -1,0 +1,9 @@
+On-device transcription is now real.
+
+* Voice notes are transcribed entirely on your device with whisper.cpp on
+  Android, iOS, and macOS — no network, as always.
+* The microphone inside a note now adds to that note instead of starting a
+  new one.
+* Fixed a WAV decoding issue that could break transcription of some recordings.
+
+Still fully offline: no network, no telemetry, no accounts. Not yet audited.
