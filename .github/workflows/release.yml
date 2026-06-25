@@ -46,6 +46,8 @@ jobs:
         working-directory: app
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: recursive
 
       # Deterministic build clock. Derive SOURCE_DATE_EPOCH from the tag commit's
       # date so an independent rebuild of the same commit gets the same value;
