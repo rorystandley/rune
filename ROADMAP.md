@@ -34,7 +34,7 @@ honestly private" to "would survive scrutiny on r/privacy".
 
 7. **Real on-device transcription on every target.** macOS and Android now use
    whisper.cpp via FFI with a bundled quantized English model and an
-   off-UI-isolate worker; Android is still pending physical-device verification.
+   off-UI-isolate worker (Android verified on a physical device).
    iOS still needs its native build/linking PR, and Windows/Linux keep the stub
    by design. See `docs/transcription.md`.
 
