@@ -17,4 +17,6 @@ export 'src/storage/file_vault_store.dart';
 export 'src/storage/vault_store.dart';
 export 'src/transcription/stub_transcription_service.dart';
 export 'src/transcription/transcription_service.dart';
+export 'src/transcription/wav_decoder.dart';
+export 'src/transcription/whisper_transcription_service.dart';
 export 'src/util/redaction.dart';

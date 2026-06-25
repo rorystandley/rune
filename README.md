@@ -11,9 +11,10 @@ network calls at all**.
 
 > **Status: working MVP.** Core vault engine, encryption, notes CRUD, search,
 > auto-lock, backup/export, and the voice-note flow are implemented and tested.
-> On-device speech-to-text is wired through a clean adapter with a clearly
-> marked **stub** (see [Voice transcription](#voice-transcription)). This is not
-> audited software — see [SECURITY.md](SECURITY.md) for honest limitations.
+> On-device speech-to-text is implemented for macOS via whisper.cpp, with stub
+> fallback still used on the remaining platforms while their native builds land
+> (see [Voice transcription](#voice-transcription)). This is not audited
+> software — see [SECURITY.md](SECURITY.md) for honest limitations.
 
 ---
 
@@ -92,7 +93,7 @@ Only ciphertext is ever written for note content. Writes are atomic
 | Models | `notes_core/src/models` | `Note`, `VaultMetadata`, `KdfParams` |
 | Storage | `notes_core/src/storage` | `VaultStore` interface + `FileVaultStore` |
 | Services | `notes_core/src/services` | `VaultService`, `NotesRepository`, `ExportService` |
-| Transcription | `notes_core/src/transcription` | `TranscriptionService` + stub |
+| Transcription | `notes_core/src/transcription` | `TranscriptionService`, WAV decode, whisper.cpp FFI + stub fallback |
 | State | `app/lib/state` | `AppController` (lock state machine, auto-lock) |
 | UI | `app/lib/ui` | create/unlock/home/editor/settings, voice sheet |
 
@@ -178,13 +179,12 @@ the security tests pass publicly on each commit (see the CI badge above).
 - Voice note flow: record locally → transcribe → insert into a note → **delete
   raw audio by default**.
 
-### Stubbed (clearly marked, honest)
+### Partially complete
 - **Local speech-to-text.** Audio *recording* is real (`record`, 16 kHz mono
-  WAV). *Transcription* uses `StubTranscriptionService`, which inserts a plainly
-  labelled placeholder instead of fabricating a transcript. The real engine
-  drops in behind the same `TranscriptionService` interface — see
-  [docs/transcription.md](docs/transcription.md) for exactly how to wire in
-  whisper.cpp.
+  WAV). On macOS, transcription runs locally through whisper.cpp via Dart FFI
+  with a bundled quantized English model. Android, iOS, Windows, and Linux still
+  use `StubTranscriptionService` until their platform-specific native builds
+  land; see [docs/transcription.md](docs/transcription.md).
 
 ### Not done yet (see [ROADMAP.md](ROADMAP.md))
 - Native file picker / share sheet for exports (currently saved to a documented

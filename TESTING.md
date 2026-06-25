@@ -103,14 +103,15 @@ Both are expected to report **no issues**.
   or microphone plugin.
 - Tests use **cheap Argon2id parameters** (256 KiB / 1 pass) for speed, except
   one test that exercises the real production parameters end-to-end.
-- Recording and real transcription are not unit-tested (they require a device
-  microphone / a wired-in engine). The recording is behind `AudioRecorderPort`
-  and transcription behind `TranscriptionService` so both are mockable when those
-  features are completed.
+- Recording is not unit-tested because it requires a device microphone. The
+  transcription seam is unit-tested for WAV decoding and local-engine behavior,
+  while real whisper.cpp inference is covered by an opt-in skipped integration
+  test because it needs the native library and model.
 
 ## Not yet tested (honest gaps)
 
 - The voice-note bottom sheet UI (depends on a real recorder).
-- Real whisper.cpp transcription (stubbed — see `docs/transcription.md`).
+- Real whisper.cpp transcription in the default CI run; it is available as an
+  opt-in integration test, see `docs/transcription.md`.
 - Per-platform file-permission behaviour of the vault directory.
 - Fuzzing of the `vault.json` / backup parsers (on the roadmap).

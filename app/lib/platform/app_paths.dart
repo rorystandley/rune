@@ -25,4 +25,5 @@ class AppPaths {
   Directory get vaultDir => Directory('${base.path}/vault');
   File get settingsFile => File('${base.path}/settings.json');
   Directory get tempAudioDir => Directory('${base.path}/audio_tmp');
+  Directory get modelsDir => Directory('${base.path}/models');
 }

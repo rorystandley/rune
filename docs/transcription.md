@@ -1,95 +1,88 @@
-# Wiring in on-device transcription (whisper.cpp)
+# On-device transcription with whisper.cpp
 
-This build ships a **stub** transcriber so the whole voice-note flow works
-end-to-end without pretending to have transcribed anything. This document
-explains exactly how to replace the stub with real **on-device** speech-to-text.
-
-## The seam
-
-All transcription goes through one interface in `notes_core`:
+Rune routes all speech-to-text through `TranscriptionService` in
+`packages/notes_core/lib/src/transcription/transcription_service.dart`:
 
 ```dart
 abstract class TranscriptionService {
   String get engineName;
-  bool get isLocal;                 // MUST be true — no cloud transcribers
+  bool get isLocal; // must be true
   Future<bool> isAvailable();
   Future<TranscriptionResult> transcribe(TranscriptionRequest request);
 }
 ```
 
-- `TranscriptionRequest.audioFilePath` points at a recorded file. The app records
-  **16 kHz mono WAV** (`AudioEncoder.wav`) precisely because that is what
-  whisper.cpp expects — no resampling needed.
-- The app already does the rest: recording, calling `transcribe(...)`, inserting
-  the returned text into a note, and deleting the audio by default.
+The product rule is unchanged: transcription must run fully on-device. Do not
+put a cloud or remote API behind this interface.
 
-To switch engines you implement `TranscriptionService` once and pass it into
-`AppController(... transcription: YourEngine())` in `app/lib/main.dart`. **No UI
-changes are required.**
+## Current status
 
-> Contract: any implementation **must run fully on-device**. Do not implement
-> this interface with a cloud API — that would break the app's core promise.
+- macOS uses `WhisperTranscriptionService`, a Dart FFI service backed by a small
+  native bridge around whisper.cpp. Recording already produces 16 kHz mono WAV,
+  and the service decodes that PCM16 WAV directly into `Float32List` samples.
+- Android and iOS still fall back to `StubTranscriptionService` until their
+  native build/linking PRs land.
+- Windows and Linux intentionally keep `StubTranscriptionService`.
 
-## Option A — whisper.cpp via Dart FFI (recommended for desktop)
+The app factory is `app/lib/platform/transcription_factory.dart`. It copies the
+bundled Flutter model asset into the application-support directory on first run
+because native whisper.cpp needs a real file path, not an asset URI.
 
-1. Build whisper.cpp as a shared library:
-   ```bash
-   git clone https://github.com/ggerganov/whisper.cpp
-   cd whisper.cpp
-   cmake -B build -DBUILD_SHARED_LIBS=ON
-   cmake --build build --config Release
-   # produces libwhisper.{dylib,so,dll}
-   ```
-2. Download a model (ggml format), e.g. `ggml-base.en.bin`:
-   ```bash
-   ./models/download-ggml-model.sh base.en
-   ```
-   Ship the model with the app or let the user pick one. Keep it on-device.
-3. Add a Dart FFI binding (e.g. with `package:ffi` + `ffigen`) that calls
-   `whisper_init_from_file`, `whisper_full`, and reads the segments back out.
-4. Implement the interface:
-   ```dart
-   class WhisperCppTranscriptionService implements TranscriptionService {
-     WhisperCppTranscriptionService({required this.modelPath});
-     final String modelPath;
+## Pinned inputs
 
-     @override String get engineName => 'whisper.cpp (base.en)';
-     @override bool get isLocal => true;
-     @override Future<bool> isAvailable() async => File(modelPath).existsSync();
+- whisper.cpp source: `ggml-org/whisper.cpp` commit
+  `43d78af5be58f41d6ffbc227d608f104577741ea`.
+- Model asset: `app/assets/models/ggml-tiny.en-q5_1.bin`.
+- Model source: `https://huggingface.co/ggerganov/whisper.cpp`, revision
+  `5359861c739e955e79d9a303bcbc70fb988958b1`, file
+  `ggml-tiny.en-q5_1.bin`.
+- Model SHA-256:
+  `c77c5766f1cef09b6b7d47f21b546cbddd4157886b3b5d6d4f709e91e66c7c2b`.
+- Licenses: whisper.cpp is MIT licensed by the ggml authors. The bundled model
+  is an OpenAI Whisper model converted to ggml format; the Hugging Face model
+  repo is marked MIT, and OpenAI documents Whisper code and weights as MIT.
 
-     @override
-     Future<TranscriptionResult> transcribe(TranscriptionRequest request) async {
-       // 1. Read 16 kHz mono PCM from request.audioFilePath (WAV → Float32List).
-       // 2. Run whisper_full() via FFI (ideally inside Isolate.run to avoid
-       //    blocking the UI thread).
-       // 3. Concatenate segment texts.
-       return TranscriptionResult(text: text, engine: engineName);
-     }
-   }
-   ```
-5. Wire it up in `app/lib/main.dart`:
-   ```dart
-   transcription: WhisperCppTranscriptionService(modelPath: modelFile.path),
-   ```
+## macOS build
 
-## Option B — a packaged plugin
+The macOS Xcode project runs `tool/whisper/build_macos.sh` as a build phase. The
+script:
 
-Packages such as `whisper_ggml` / `whisper_flutter_plus` wrap whisper.cpp for
-Flutter (handy on Android/iOS where bundling native libs by hand is fiddly).
-Implement `TranscriptionService` on top of the chosen package's API. Verify it
-performs inference **locally** and bundles/loads the model from device storage.
+1. Uses `third_party/whisper.cpp` if it exists and is exactly at the pinned
+   commit.
+2. Otherwise fetches the pinned commit into `app/build/whisper/src/whisper.cpp`.
+3. Builds `native/whisper/rune_whisper_bridge.cc` and whisper.cpp from source
+   with CMake.
+4. Copies `librune_whisper.dylib` into the app bundle's `Contents/Frameworks`.
 
-## Performance notes
-
-- Run inference off the UI isolate (`Isolate.run`) so the app stays responsive.
-- `base.en` is a good speed/quality trade-off for note dictation; `tiny.en` is
-  faster on low-end phones.
-- The model file is large (tens to hundreds of MB). Decide whether to bundle it
-  or download once on first use (a download *is* a network call, so make it
-  explicit, opt-in, and one-time — consistent with PRIVACY.md).
+Install `cmake` before building the macOS app locally. No prebuilt native
+library is committed.
 
 ## Tests
 
-Add a unit test that feeds a short known WAV and asserts the transcript contains
-expected words, plus a test asserting `isLocal == true`. The existing voice-note
-UI flow needs no change.
+CI-safe tests cover:
+
+- 16 kHz mono PCM16 WAV decoding.
+- `WhisperTranscriptionService.isLocal == true`.
+- Graceful unavailability when the model/native library is absent.
+
+The real native transcription path is represented by a skipped integration test
+in `app/integration_test/whisper_transcription_test.dart`. To run it manually,
+build the native bridge, then provide:
+
+```bash
+RUNE_RUN_WHISPER_TEST=1 \
+RUNE_WHISPER_LIBRARY="$PWD/build/macos/Build/Products/Debug/Rune.app/Contents/Frameworks/librune_whisper.dylib" \
+flutter test integration_test/whisper_transcription_test.dart
+```
+
+Only claim a platform works after that platform has transcribed a real WAV.
+
+## Follow-ups
+
+- Android: add the NDK/CMake build for `arm64-v8a`, `armeabi-v7a`, and `x86_64`,
+  bundle the `.so`, and extend `tool/reproducibility/build_release_apk.sh` so
+  whisper's native library stays deterministic.
+- iOS: build a static library or xcframework and load it with
+  `DynamicLibrary.process()`.
+- F-Droid: update the separate fdroiddata recipe for the NDK build and bundled
+  MIT-licensed model asset.
