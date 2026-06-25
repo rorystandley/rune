@@ -5,7 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/app.dart';
 import 'package:notes_app/platform/audio_recorder.dart';
 import 'package:notes_app/state/app_controller.dart';
+import 'package:notes_app/state/app_scope.dart';
 import 'package:notes_app/state/app_settings.dart';
+import 'package:notes_app/ui/widgets/note_editor.dart';
 import 'package:notes_core/notes_core.dart';
 
 // NOTE: anything that touches the filesystem (createTemp, settings load,
@@ -111,6 +113,50 @@ void main() {
 
     expect(controller.repo.count, 1); // the tap actually created a note
     expect(find.text('New note'), findsWidgets); // and it renders
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
+  testWidgets('editor insert handle appends a transcript into the open note',
+      (tester) async {
+    late Directory root;
+    late AppController controller;
+    late Note note;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_editor_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(const AppSettings(autoLockMinutes: 0));
+      await controller.init();
+      await controller.createVault('passphrase123');
+      note = await controller.newNote();
+      await controller.saveNote(note.id, title: 'T', body: 'first line');
+      note = controller.repo.getNote(note.id)!;
+    });
+
+    final handle = EditorInsertHandle();
+    await tester.pumpWidget(
+      AppScope(
+        controller: controller,
+        child: MaterialApp(
+          home: Scaffold(
+            body: NoteEditorView(note: note, insertHandle: handle),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // The mounted editor wired itself to the handle, and an inserted transcript
+    // lands in the open note's body on its own line — not in a new note.
+    expect(handle.isAttached, isTrue);
+    handle.insert('dictated words');
+    await tester.pump();
+
+    expect(find.text('first line\ndictated words'), findsOneWidget);
+    expect(controller.repo.count, 1); // no extra note was created
 
     controller.dispose();
     await tester.runAsync(() async {

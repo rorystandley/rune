@@ -73,8 +73,15 @@ class _NarrowHome extends StatelessWidget {
 
 // ----------------------------------------------------------------- wide ---
 
-class _WideHome extends StatelessWidget {
+class _WideHome extends StatefulWidget {
   const _WideHome();
+
+  @override
+  State<_WideHome> createState() => _WideHomeState();
+}
+
+class _WideHomeState extends State<_WideHome> {
+  final EditorInsertHandle _insertHandle = EditorInsertHandle();
 
   @override
   Widget build(BuildContext context) {
@@ -106,12 +113,19 @@ class _WideHome extends StatelessWidget {
                 ? const _EmptyEditor()
                 : Column(
                     children: [
-                      _EditorToolbar(noteId: selected.id),
+                      _EditorToolbar(
+                        noteId: selected.id,
+                        onVoice: () => showVoiceNoteSheet(
+                          context,
+                          onTranscribed: _insertHandle.insert,
+                        ),
+                      ),
                       const Divider(height: 0.5),
                       Expanded(
                         child: NoteEditorView(
                           key: ValueKey(selected.id),
                           note: selected,
+                          insertHandle: _insertHandle,
                         ),
                       ),
                     ],
@@ -181,8 +195,9 @@ class _SidebarHeader extends StatelessWidget {
 }
 
 class _EditorToolbar extends StatelessWidget {
-  const _EditorToolbar({required this.noteId});
+  const _EditorToolbar({required this.noteId, required this.onVoice});
   final String noteId;
+  final VoidCallback onVoice;
 
   @override
   Widget build(BuildContext context) {
@@ -195,7 +210,7 @@ class _EditorToolbar extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.mic_none),
             tooltip: 'Voice note',
-            onPressed: () => showVoiceNoteSheet(context),
+            onPressed: onVoice,
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline),

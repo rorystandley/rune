@@ -6,15 +6,22 @@ import '../widgets/note_editor.dart';
 import '../widgets/voice_note_sheet.dart';
 
 /// Full-screen note editor used on narrow (mobile) layouts.
-class EditorScreen extends StatelessWidget {
+class EditorScreen extends StatefulWidget {
   const EditorScreen({super.key, required this.noteId});
 
   final String noteId;
 
   @override
+  State<EditorScreen> createState() => _EditorScreenState();
+}
+
+class _EditorScreenState extends State<EditorScreen> {
+  final EditorInsertHandle _insertHandle = EditorInsertHandle();
+
+  @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    final note = controller.repo.getNote(noteId);
+    final note = controller.repo.getNote(widget.noteId);
 
     if (note == null) {
       return const Scaffold(body: Center(child: Text('Note not found')));
@@ -26,7 +33,8 @@ class EditorScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.mic_none),
             tooltip: 'Voice note',
-            onPressed: () => showVoiceNoteSheet(context),
+            onPressed: () =>
+                showVoiceNoteSheet(context, onTranscribed: _insertHandle.insert),
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
@@ -39,13 +47,17 @@ class EditorScreen extends StatelessWidget {
                 confirmLabel: 'Delete',
               );
               if (!ok) return;
-              await controller.deleteNote(noteId);
+              await controller.deleteNote(widget.noteId);
               if (context.mounted) Navigator.of(context).pop();
             },
           ),
         ],
       ),
-      body: NoteEditorView(key: ValueKey(note.id), note: note),
+      body: NoteEditorView(
+        key: ValueKey(note.id),
+        note: note,
+        insertHandle: _insertHandle,
+      ),
     );
   }
 }
