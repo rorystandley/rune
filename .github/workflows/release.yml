@@ -90,7 +90,11 @@ jobs:
 
       - name: Linux build deps
         if: matrix.target == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            libsecret-1-dev
 
       # Optional release signing for Android. Add these repo secrets to sign for
       # Google Play; otherwise the build uses debug signing (test artifact only).

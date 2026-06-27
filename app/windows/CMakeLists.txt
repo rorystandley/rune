@@ -57,6 +57,14 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# local_auth_windows 2.0.1 still uses Microsoft's experimental coroutine
+# compatibility header. Visual Studio 2026 requires this documented opt-in
+# until the plugin moves fully to the standard C++20 coroutine header.
+if(MSVC AND TARGET local_auth_windows_plugin)
+  target_compile_definitions(local_auth_windows_plugin PRIVATE
+    "_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS")
+endif()
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can

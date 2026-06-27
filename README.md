@@ -112,8 +112,9 @@ Only ciphertext is ever written for note content. Writes are atomic
 - Flutter SDK 3.44+ (Dart 3.12+). Install from <https://flutter.dev> or, on
   macOS, `brew install --cask flutter`.
 - For device/desktop builds you also need the platform toolchain (Xcode for
-  macOS/iOS, Android SDK for Android, GTK/CMake for Linux, Visual Studio for
-  Windows). **None of these are needed to run the tests.**
+  macOS/iOS, Android SDK for Android, GTK/CMake plus `libsecret-1-dev` for
+  Linux, Visual Studio for Windows). **None of these are needed to run the
+  tests.**
 
 ### Get the source
 
