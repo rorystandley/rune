@@ -4,6 +4,18 @@ All notable changes to Rune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Optional biometric / OS unlock: users can opt in to cache the vault DEK behind
+  Face ID, Touch ID, Android strong biometrics, or Windows Hello without storing
+  the passphrase or changing the passphrase-only unlock path. Once enabled, the
+  OS authentication prompt starts automatically on each locked session.
+
+### Fixed
+- macOS biometric setup now includes the Keychain Sharing entitlement and
+  development signing required to store the Touch ID-protected vault key.
+
 ## [0.2.0] - 2026-06-25
 
 ### Added
@@ -35,5 +47,6 @@ export behind an explicit warning), and local voice-note recording. Fully
 offline — no network, no telemetry, no accounts. On-device transcription
 shipped as a clearly-labelled stub. Not yet audited.
 
+[Unreleased]: https://github.com/rorystandley/rune/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/rorystandley/rune/releases/tag/v0.2.0
 [0.1.0]: https://github.com/rorystandley/rune/releases/tag/v0.1.0

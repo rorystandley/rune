@@ -9,11 +9,11 @@ who don't trust apps with their data. Notes never leave your device, are
 encrypted at rest with modern authenticated encryption, and the app makes **no
 network calls at all**.
 
-> **Status: working MVP.** Core vault engine, encryption, notes CRUD, search,
-> auto-lock, backup/export, and the voice-note flow are implemented and tested.
-> On-device speech-to-text is implemented for macOS, Android, and iOS via
-> whisper.cpp (Android and iOS verified on physical devices), with stub
-> fallback still used on Windows and Linux
+> **Status: working MVP.** Core vault engine, encryption, optional
+> biometric/OS unlock, notes CRUD, search, auto-lock, backup/export, and the
+> voice-note flow are implemented and tested. On-device speech-to-text is
+> implemented for macOS, Android, and iOS via whisper.cpp (Android and iOS
+> verified on physical devices), with stub fallback still used on Windows and Linux
 > (see [Voice transcription](#voice-transcription)). This is not audited
 > software — see [SECURITY.md](SECURITY.md) for honest limitations.
 
@@ -68,6 +68,10 @@ each note ──encrypt with DEK (XChaCha20-Poly1305, random nonce)──▶ .no
   re-encrypted, and the design never paints us into a corner.
 - A **wrong passphrase** produces a wrong KEK, which fails the wrapped key's
   authentication tag → unlock is rejected. (Proven by tests.)
+- Optional biometric / OS unlock caches the DEK in this device's platform
+  credential store only after the user opts in. Once enabled, platform
+  authentication starts automatically on each locked session; the passphrase
+  path remains unchanged and always available.
 
 ### On-disk layout
 
@@ -78,7 +82,7 @@ each note ──encrypt with DEK (XChaCha20-Poly1305, random nonce)──▶ .no
 │   └── notes/
 │       ├── 5f3a…1c.note  # AEAD blob: nonce || ciphertext || MAC  (filename = random id)
 │       └── …
-├── settings.json         # NON-secret: auto-lock timeout, toggles (no secrets)
+├── settings.json         # NON-secret: auto-lock timeout, toggles/bindings (no secrets)
 └── audio_tmp/            # transient voice recordings (deleted by default)
 ```
 
@@ -95,6 +99,7 @@ Only ciphertext is ever written for note content. Writes are atomic
 | Storage | `notes_core/src/storage` | `VaultStore` interface + `FileVaultStore` |
 | Services | `notes_core/src/services` | `VaultService`, `NotesRepository`, `ExportService` |
 | Transcription | `notes_core/src/transcription` | `TranscriptionService`, WAV decode, whisper.cpp FFI + stub fallback |
+| Platform glue | `app/lib/platform` | app paths, microphone, optional OS-keystore unlock |
 | State | `app/lib/state` | `AppController` (lock state machine, auto-lock) |
 | UI | `app/lib/ui` | create/unlock/home/editor/settings, voice sheet |
 
@@ -186,6 +191,9 @@ the security tests pass publicly on each commit (see the CI badge above).
 - First-launch vault creation with passphrase + irreversibility warning.
 - Lock / unlock; app starts locked if a vault exists; manual lock; auto-lock on
   inactivity; lock-on-background.
+- Optional Face ID / Touch ID / Windows Hello unlock, off by default, caching
+  only the vault DEK behind the platform credential store and prompting
+  automatically after opt-in.
 - Argon2id + XChaCha20-Poly1305 envelope encryption; encrypted at rest.
 - Wrong passphrase cannot decrypt (test-proven).
 - Notes: create, edit (autosave), delete, list, local search.
@@ -211,7 +219,7 @@ the security tests pass publicly on each commit (see the CI badge above).
   path).
 - Optional native crypto acceleration (`cryptography_flutter`) for faster
   Argon2id on mobile.
-- Metadata-hardening (size padding), biometric unlock, encrypted attachments.
+- Metadata-hardening (size padding), encrypted attachments.
 
 ---
 

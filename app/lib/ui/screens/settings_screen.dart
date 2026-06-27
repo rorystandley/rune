@@ -32,12 +32,15 @@ class SettingsScreen extends StatelessWidget {
                   ? settings.autoLockMinutes
                   : 5,
               onChanged: (v) => controller.updateSettings(
-                  settings.copyWith(autoLockMinutes: v)),
+                settings.copyWith(autoLockMinutes: v),
+              ),
               items: _autoLockOptions
-                  .map((m) => DropdownMenuItem(
-                        value: m,
-                        child: Text(m == 0 ? 'Off' : '$m min'),
-                      ))
+                  .map(
+                    (m) => DropdownMenuItem(
+                      value: m,
+                      child: Text(m == 0 ? 'Off' : '$m min'),
+                    ),
+                  )
                   .toList(),
             ),
           ),
@@ -45,8 +48,18 @@ class SettingsScreen extends StatelessWidget {
             secondary: const Icon(Icons.exit_to_app),
             title: const Text('Lock when sent to background'),
             value: settings.lockOnBackground,
-            onChanged: (v) => controller
-                .updateSettings(settings.copyWith(lockOnBackground: v)),
+            onChanged: (v) => controller.updateSettings(
+              settings.copyWith(lockOnBackground: v),
+            ),
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.fingerprint),
+            title: Text(controller.biometricUnlockLabel),
+            subtitle: Text(_biometricSubtitle(controller)),
+            value: controller.biometricUnlockReady,
+            onChanged: controller.busy || !controller.biometricUnlockAvailable
+                ? null
+                : (v) => _setBiometricUnlock(context, controller, v),
           ),
           ListTile(
             leading: const Icon(Icons.password),
@@ -65,30 +78,40 @@ class SettingsScreen extends StatelessWidget {
           SwitchListTile(
             secondary: const Icon(Icons.save_outlined),
             title: const Text('Keep audio by default'),
-            subtitle:
-                const Text('Off = delete the recording after transcription'),
+            subtitle: const Text(
+              'Off = delete the recording after transcription',
+            ),
             value: settings.keepAudioByDefault,
-            onChanged: (v) => controller
-                .updateSettings(settings.copyWith(keepAudioByDefault: v)),
+            onChanged: (v) => controller.updateSettings(
+              settings.copyWith(keepAudioByDefault: v),
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.record_voice_over_outlined),
             title: const Text('Transcription engine'),
-            subtitle: Text('${controller.transcription.engineName}'
-                '${controller.transcription.isLocal ? ' · on-device' : ''}'),
+            subtitle: Text(
+              '${controller.transcription.engineName}'
+              '${controller.transcription.isLocal ? ' · on-device' : ''}',
+            ),
           ),
           _section(context, 'Backup & export'),
           ListTile(
             leading: const Icon(Icons.shield_outlined),
             title: const Text('Export encrypted backup'),
-            subtitle: const Text('Safe: stays encrypted, needs your passphrase'),
+            subtitle: const Text(
+              'Safe: stays encrypted, needs your passphrase',
+            ),
             onTap: () => _exportEncrypted(context, controller),
           ),
           ListTile(
-            leading: Icon(Icons.warning_amber_rounded,
-                color: Theme.of(context).colorScheme.error),
+            leading: Icon(
+              Icons.warning_amber_rounded,
+              color: Theme.of(context).colorScheme.error,
+            ),
             title: const Text('Export plaintext (unencrypted)'),
-            subtitle: const Text('Dangerous: writes readable, unprotected files'),
+            subtitle: const Text(
+              'Dangerous: writes readable, unprotected files',
+            ),
             onTap: () => _exportPlaintext(context, controller),
           ),
           _section(context, 'About'),
@@ -100,8 +123,10 @@ class SettingsScreen extends StatelessWidget {
           const ListTile(
             leading: Icon(Icons.verified_user_outlined),
             title: Text('Cryptography'),
-            subtitle: Text('Argon2id key derivation · XChaCha20-Poly1305 AEAD\n'
-                'via the audited `cryptography` Dart package'),
+            subtitle: Text(
+              'Argon2id key derivation · XChaCha20-Poly1305 AEAD\n'
+              'via the audited `cryptography` Dart package',
+            ),
           ),
           const SizedBox(height: 24),
         ],
@@ -110,18 +135,20 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _section(BuildContext context, String title) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
-        child: Text(
-          title.toUpperCase(),
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Theme.of(context).hintColor,
-                letterSpacing: 0.8,
-              ),
-        ),
-      );
+    padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
+    child: Text(
+      title.toUpperCase(),
+      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+        color: Theme.of(context).hintColor,
+        letterSpacing: 0.8,
+      ),
+    ),
+  );
 
   Future<void> _exportEncrypted(
-      BuildContext context, AppController controller) async {
+    BuildContext context,
+    AppController controller,
+  ) async {
     try {
       final file = await controller.exportEncryptedBackup();
       if (context.mounted) {
@@ -133,11 +160,14 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _exportPlaintext(
-      BuildContext context, AppController controller) async {
+    BuildContext context,
+    AppController controller,
+  ) async {
     final ok = await confirmDestructive(
       context,
       title: 'Export unencrypted notes?',
-      message: 'This writes ALL of your notes as plain, readable files with no '
+      message:
+          'This writes ALL of your notes as plain, readable files with no '
           'encryption. Anyone with access to those files can read them. Only do '
           'this if you understand the risk and will store the files safely.',
       confirmLabel: 'Export plaintext',
@@ -146,7 +176,11 @@ class SettingsScreen extends StatelessWidget {
     try {
       final dir = await controller.exportPlaintext(confirmed: true);
       if (context.mounted) {
-        await _showPath(context, 'Plaintext export (UNENCRYPTED) saved', dir.path);
+        await _showPath(
+          context,
+          'Plaintext export (UNENCRYPTED) saved',
+          dir.path,
+        );
       }
     } catch (e) {
       if (context.mounted) _snack(context, 'Export failed.');
@@ -154,10 +188,71 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _changePassphrase(
-      BuildContext context, AppController controller) async {
+    BuildContext context,
+    AppController controller,
+  ) async {
     await showDialog<void>(
       context: context,
       builder: (_) => _ChangePassphraseDialog(controller: controller),
+    );
+  }
+
+  String _biometricSubtitle(AppController controller) {
+    if (!controller.biometricUnlockAvailable) {
+      return controller.biometricUnlockAvailability.reason ??
+          'Not available on this device';
+    }
+    if (controller.biometricUnlockReady) {
+      return 'On - prompts automatically when locked';
+    }
+    if (controller.settings.biometricUnlockEnabled) {
+      return 'Set up again for this vault';
+    }
+    return 'Off';
+  }
+
+  Future<void> _setBiometricUnlock(
+    BuildContext context,
+    AppController controller,
+    bool enabled,
+  ) async {
+    if (!enabled) {
+      await controller.disableBiometricUnlock();
+      if (context.mounted) _snack(context, 'Biometric unlock disabled.');
+      return;
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Enable ${controller.biometricUnlockLabel}?'),
+        content: const Text(
+          'Rune will store this vault key in this device\'s secure credential '
+          'store and prompt automatically when the vault is locked. Your '
+          'passphrase still works and is still required anywhere you do not '
+          'enable this.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Enable'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final enabledNow = await controller.enableBiometricUnlock();
+    if (!context.mounted) return;
+    _snack(
+      context,
+      enabledNow
+          ? 'Biometric unlock enabled.'
+          : controller.biometricUnlockError ?? 'Biometric unlock unavailable.',
     );
   }
 
@@ -172,8 +267,7 @@ class SettingsScreen extends StatelessWidget {
           children: [
             const Text('Saved to:'),
             const SizedBox(height: 8),
-            SelectableText(path,
-                style: Theme.of(ctx).textTheme.bodySmall),
+            SelectableText(path, style: Theme.of(ctx).textTheme.bodySmall),
           ],
         ),
         actions: [
@@ -186,9 +280,9 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _snack(BuildContext context, String message) =>
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+  void _snack(BuildContext context, String message) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(message)));
 }
 
 class _PrivacyPostureCard extends StatelessWidget {
@@ -214,8 +308,10 @@ class _PrivacyPostureCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.privacy_tip_outlined,
-                    color: theme.colorScheme.primary),
+                Icon(
+                  Icons.privacy_tip_outlined,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Text('Privacy posture', style: theme.textTheme.titleMedium),
               ],
@@ -236,9 +332,12 @@ class _PrivacyPostureCard extends StatelessWidget {
             const Divider(height: 24),
             Text('Vault location', style: theme.textTheme.labelMedium),
             const SizedBox(height: 2),
-            SelectableText(controller.vaultLocation,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.hintColor)),
+            SelectableText(
+              controller.vaultLocation,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.hintColor,
+              ),
+            ),
           ],
         ),
       ),
@@ -287,9 +386,9 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
       await widget.controller.changePassphrase(_current.text, _next.text);
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Passphrase changed.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Passphrase changed.')));
       }
     } on WrongPassphraseException {
       setState(() {
@@ -326,12 +425,16 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
           TextField(
             controller: _confirm,
             obscureText: true,
-            decoration: const InputDecoration(labelText: 'Confirm new passphrase'),
+            decoration: const InputDecoration(
+              labelText: 'Confirm new passphrase',
+            ),
           ),
           if (_error != null) ...[
             const SizedBox(height: 10),
-            Text(_error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           ],
         ],
       ),
@@ -344,7 +447,10 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
           onPressed: _busy ? null : _submit,
           child: _busy
               ? const SizedBox(
-                  height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Text('Change'),
         ),
       ],

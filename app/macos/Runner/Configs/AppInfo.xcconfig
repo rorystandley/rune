@@ -10,5 +10,8 @@ PRODUCT_NAME = Rune
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = co.rorystandley.rune
 
+// Optional, ignored local signing settings for Keychain-enabled development.
+#include? "LocalSigning.xcconfig"
+
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 co.rorystandley. All rights reserved.

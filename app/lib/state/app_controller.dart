@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:notes_core/notes_core.dart';
 
 import '../platform/audio_recorder.dart';
+import '../platform/biometric_unlock_store.dart';
 import 'app_settings.dart';
 
 enum AppPhase { loading, needsCreation, locked, unlocked }
@@ -23,9 +25,12 @@ class AppController extends ChangeNotifier {
     required this.settingsStore,
     required this.transcription,
     required this.recorder,
+    BiometricUnlockStore? biometricUnlockStore,
     CryptoService? crypto,
     this.createKdfParams, // test seam: cheap params in tests, null = production
-  }) : store = FileVaultStore(vaultDir) {
+  }) : biometricUnlockStore =
+           biometricUnlockStore ?? const DisabledBiometricUnlockStore(),
+       store = FileVaultStore(vaultDir) {
     final c = crypto ?? CryptoService();
     vault = VaultService(store: store, crypto: c);
     repo = NotesRepository(vault: vault, store: store);
@@ -38,6 +43,7 @@ class AppController extends ChangeNotifier {
   final SettingsStore settingsStore;
   final TranscriptionService transcription;
   final AudioRecorderPort recorder;
+  final BiometricUnlockStore biometricUnlockStore;
   final KdfParams? createKdfParams;
 
   late final FileVaultStore store;
@@ -50,6 +56,12 @@ class AppController extends ChangeNotifier {
   String _search = '';
   String? _selectedId;
   String? _unlockError;
+  String? _biometricUnlockError;
+  BiometricUnlockAvailability _biometricUnlockAvailability =
+      const BiometricUnlockAvailability.unavailable(
+        'Checking biometric unlock support.',
+      );
+  bool _biometricUnlockReady = false;
   bool _busy = false;
   Timer? _autoLockTimer;
 
@@ -58,6 +70,14 @@ class AppController extends ChangeNotifier {
   String get search => _search;
   String? get selectedId => _selectedId;
   String? get unlockError => _unlockError;
+  String? get biometricUnlockError => _biometricUnlockError;
+  BiometricUnlockAvailability get biometricUnlockAvailability =>
+      _biometricUnlockAvailability;
+  String get biometricUnlockLabel => _biometricUnlockAvailability.label;
+  bool get biometricUnlockAvailable => _biometricUnlockAvailability.isAvailable;
+  bool get biometricUnlockReady => _biometricUnlockReady;
+  bool get canUnlockWithBiometric =>
+      _phase == AppPhase.locked && _biometricUnlockReady && !_busy;
   bool get busy => _busy;
   String get vaultLocation => store.description;
 
@@ -69,8 +89,9 @@ class AppController extends ChangeNotifier {
   /// otherwise the create-vault flow.
   Future<void> init() async {
     _settings = await settingsStore.load();
-    _phase =
-        (await vault.vaultExists()) ? AppPhase.locked : AppPhase.needsCreation;
+    final exists = await vault.vaultExists();
+    _phase = exists ? AppPhase.locked : AppPhase.needsCreation;
+    await _refreshBiometricUnlockState(vaultExists: exists, notify: false);
     notifyListeners();
   }
 
@@ -81,6 +102,7 @@ class AppController extends ChangeNotifier {
     try {
       await vault.createVault(passphrase, kdfParams: createKdfParams);
       await repo.loadAll();
+      await _disableBiometricUnlock(saveSettings: true);
       _enterUnlocked();
     } finally {
       _setBusy(false);
@@ -114,6 +136,7 @@ class AppController extends ChangeNotifier {
     _selectedId = null;
     _search = '';
     _unlockError = null;
+    _biometricUnlockError = null;
     _phase = AppPhase.locked;
     notifyListeners();
   }
@@ -127,8 +150,113 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> changePassphrase(String current, String next) =>
-      vault.changePassphrase(current, next);
+  Future<void> changePassphrase(String current, String next) async {
+    await vault.changePassphrase(current, next);
+    await _refreshCachedDekAfterVaultHeaderChange();
+  }
+
+  Future<bool> enableBiometricUnlock() async {
+    _setBusy(true);
+    _biometricUnlockError = null;
+    try {
+      final availability = await biometricUnlockStore.checkAvailability();
+      _biometricUnlockAvailability = availability;
+      if (!availability.isAvailable) {
+        _biometricUnlockError =
+            availability.reason ?? 'Biometric unlock is not available.';
+        notifyListeners();
+        return false;
+      }
+
+      final binding = await _currentVaultBinding();
+      if (binding == null || !vault.isUnlocked) {
+        _biometricUnlockError =
+            'Unlock with your passphrase before enabling biometric unlock.';
+        notifyListeners();
+        return false;
+      }
+
+      final dek = vault.exportDekForPlatformUnlockCache();
+      try {
+        await biometricUnlockStore.saveCachedDek(
+          vaultBinding: binding,
+          dek: dek,
+        );
+      } finally {
+        _zero(dek);
+      }
+
+      _settings = _settings.copyWith(
+        biometricUnlockEnabled: true,
+        biometricUnlockVaultBinding: binding,
+      );
+      await settingsStore.save(_settings);
+      _biometricUnlockReady = true;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      _biometricUnlockError =
+          'Biometric unlock could not be enabled on this device.';
+      notifyListeners();
+      return false;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  Future<void> disableBiometricUnlock() =>
+      _disableBiometricUnlock(saveSettings: true);
+
+  Future<bool> unlockWithBiometric() async {
+    _setBusy(true);
+    _unlockError = null;
+    _biometricUnlockError = null;
+    try {
+      final binding = await _currentVaultBinding();
+      if (binding == null ||
+          !_settings.biometricUnlockEnabled ||
+          _settings.biometricUnlockVaultBinding != binding) {
+        _unlockError = 'Biometric unlock needs to be set up again.';
+        await _disableBiometricUnlock(saveSettings: true);
+        notifyListeners();
+        return false;
+      }
+
+      final cachedDek = await biometricUnlockStore.readCachedDek(
+        vaultBinding: binding,
+      );
+      if (cachedDek == null) {
+        _unlockError = 'Biometric unlock needs to be set up again.';
+        await _disableBiometricUnlock(saveSettings: true);
+        notifyListeners();
+        return false;
+      }
+
+      try {
+        await vault.unlockWithPlatformCachedDek(cachedDek);
+        await repo.loadAll();
+      } catch (_) {
+        vault.lock();
+        repo.clear();
+        _unlockError =
+            'Biometric unlock could not open this vault. Use your passphrase.';
+        await _disableBiometricUnlock(saveSettings: true);
+        notifyListeners();
+        return false;
+      } finally {
+        _zero(cachedDek);
+      }
+
+      _enterUnlocked();
+      return true;
+    } catch (_) {
+      _unlockError = 'Biometric unlock failed. Use your passphrase.';
+      notifyListeners();
+      return false;
+    } finally {
+      _setBusy(false);
+    }
+  }
 
   // ---------------------------------------------------------------- notes ---
 
@@ -140,8 +268,11 @@ class AppController extends ChangeNotifier {
   }
 
   /// Autosave entry point from the editor. No-op if nothing changed.
-  Future<void> saveNote(String id,
-      {required String title, required String body}) async {
+  Future<void> saveNote(
+    String id, {
+    required String title,
+    required String body,
+  }) async {
     final existing = repo.getNote(id);
     if (existing == null) return;
     if (existing.title == title && existing.body == body) return;
@@ -174,11 +305,12 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> refreshBiometricUnlockState() => _refreshBiometricUnlockState();
+
   // --------------------------------------------------------------- export ---
 
   Future<File> exportEncryptedBackup() async {
-    final target =
-        File('${exportsDir.path}/notes-backup-${_stamp()}.notesbak');
+    final target = File('${exportsDir.path}/notes-backup-${_stamp()}.notesbak');
     return exporter.exportEncryptedBackup(target);
   }
 
@@ -201,8 +333,7 @@ class AppController extends ChangeNotifier {
     _autoLockTimer?.cancel();
     _autoLockTimer = null;
     if (_settings.autoLockMinutes <= 0 || _phase != AppPhase.unlocked) return;
-    _autoLockTimer =
-        Timer(Duration(minutes: _settings.autoLockMinutes), lock);
+    _autoLockTimer = Timer(Duration(minutes: _settings.autoLockMinutes), lock);
   }
 
   // ---------------------------------------------------------------- utils ---
@@ -210,6 +341,87 @@ class AppController extends ChangeNotifier {
   void _setBusy(bool value) {
     _busy = value;
     notifyListeners();
+  }
+
+  Future<void> _refreshBiometricUnlockState({
+    bool notify = true,
+    bool? vaultExists,
+  }) async {
+    _biometricUnlockAvailability = await biometricUnlockStore
+        .checkAvailability();
+    final exists = vaultExists ?? await vault.vaultExists();
+    final binding = exists ? await _currentVaultBinding() : null;
+    _biometricUnlockReady =
+        _settings.biometricUnlockEnabled &&
+        _biometricUnlockAvailability.isAvailable &&
+        binding != null &&
+        _settings.biometricUnlockVaultBinding == binding;
+    if (notify) notifyListeners();
+  }
+
+  Future<void> _disableBiometricUnlock({required bool saveSettings}) async {
+    await biometricUnlockStore.clearCachedDek();
+    _settings = _settings.copyWith(
+      biometricUnlockEnabled: false,
+      biometricUnlockVaultBinding: null,
+    );
+    _biometricUnlockReady = false;
+    if (saveSettings) await settingsStore.save(_settings);
+    notifyListeners();
+  }
+
+  Future<void> _refreshCachedDekAfterVaultHeaderChange() async {
+    if (!_settings.biometricUnlockEnabled) {
+      await _refreshBiometricUnlockState();
+      return;
+    }
+
+    final binding = await _currentVaultBinding();
+    if (binding == null || !vault.isUnlocked) {
+      await _disableBiometricUnlock(saveSettings: true);
+      return;
+    }
+
+    final dek = vault.exportDekForPlatformUnlockCache();
+    try {
+      await biometricUnlockStore.saveCachedDek(vaultBinding: binding, dek: dek);
+      _settings = _settings.copyWith(biometricUnlockVaultBinding: binding);
+      await settingsStore.save(_settings);
+      await _refreshBiometricUnlockState();
+    } catch (_) {
+      _biometricUnlockError =
+          'Biometric unlock was disabled after the passphrase change.';
+      await _disableBiometricUnlock(saveSettings: true);
+    } finally {
+      _zero(dek);
+    }
+  }
+
+  Future<String?> _currentVaultBinding() async {
+    if (!await vault.vaultExists()) return null;
+    final meta = await store.readMetadata();
+    return _vaultBinding(meta);
+  }
+
+  String _vaultBinding(VaultMetadata meta) {
+    final kdf = meta.kdfParams;
+    return [
+      VaultMetadata.formatId,
+      meta.version,
+      meta.createdAt.toUtc().toIso8601String(),
+      meta.cipher.id,
+      kdf.memoryKiB,
+      kdf.iterations,
+      kdf.parallelism,
+      base64UrlEncode(kdf.salt),
+      base64UrlEncode(meta.wrappedKey),
+    ].join('|');
+  }
+
+  void _zero(Uint8List bytes) {
+    for (var i = 0; i < bytes.length; i++) {
+      bytes[i] = 0;
+    }
   }
 
   String _stamp() =>

@@ -41,6 +41,29 @@ authentication tag fails, and unlock is rejected with `WrongPassphraseException`
 There is no separate "password check" value to attack — authentication *is* the
 check.
 
+### Optional platform unlock
+
+Biometric / OS unlock is **strictly opt-in** and does not replace or weaken the
+passphrase path. When enabled from Settings while the vault is already unlocked,
+Rune exports a copy of the current DEK and stores it behind the platform
+credential store:
+
+- **Android:** `flutter_secure_storage` with `AndroidOptions.biometric`,
+  `enforceBiometrics: true`, and strong-biometric-only KeyStore access.
+- **iOS / macOS:** Keychain storage with `biometryCurrentSet` access control and
+  Secure Enclave wrapping when available.
+- **Windows:** Windows Hello authentication gates access to the DEK stored in
+  Windows Credential Manager.
+
+The cached item contains the DEK plus a non-secret binding to the current vault
+header. It does **not** contain the passphrase or passphrase-derived KEK. If the
+binding no longer matches, or the user disables the setting, the cache is not
+used and the secure-storage entry is deleted. A fresh install, another device,
+or a user who never opts in remains passphrase-only. Once enabled, Rune requests
+platform authentication automatically when a locked session is shown. A
+canceled or failed prompt leaves the passphrase form and a manual platform-unlock
+retry available; it does not weaken or bypass either credential gate.
+
 ### Why this design
 
 - **XChaCha20-Poly1305** uses a 192-bit nonce, so random per-message nonces have
@@ -70,7 +93,8 @@ in `vault.json` and are read back at unlock, so they are forward-compatible.
 - **Device-at-rest / "stolen laptop or phone" (while locked).** With the app
   locked or closed, note content on disk is ciphertext under a key that exists
   only as a passphrase in the owner's head. Without the passphrase, the files
-  are AEAD ciphertext + a salted Argon2id-wrapped key.
+  are AEAD ciphertext + a salted Argon2id-wrapped key. If platform unlock is
+  enabled on that device, the attacker must also fail the OS credential gate.
 - **Casual disk inspection / backup leakage of content.** Anyone reading the
   vault directory, a file-level backup, or the encrypted export sees no note
   text, titles, or bodies — only ciphertext and non-secret KDF parameters.
@@ -95,6 +119,10 @@ Be clear-eyed about these:
   common passphrase can still be brute-forced offline if someone has your vault
   files. Use a strong, unique passphrase.
 - **Keyloggers / hardware implants / shoulder-surfing.** Out of scope.
+- **Someone who can satisfy the enrolled OS credential on an opt-in device.**
+  Biometric / Windows Hello unlock deliberately adds a second way to release the
+  DEK on that device. Use passphrase-only mode if that is not an acceptable
+  tradeoff.
 - **Cold-boot / RAM forensics.** Keys live in RAM while unlocked; a determined
   physical attacker with the right tools may recover them (see memory note).
 - **OS-level or filesystem metadata.** File counts, sizes, and timestamps are
@@ -137,6 +165,9 @@ random 128-bit ids, not derived from content.
 - **Never persisted in the clear.** Decrypted notes exist only in memory
   (`NotesRepository`) while unlocked and are dropped on lock. The only way
   plaintext touches disk is the explicit, confirmation-gated plaintext export.
+- **Optional cached DEK.** If biometric / OS unlock is enabled, the DEK is also
+  stored in the platform credential store for this device only. This setting is
+  off by default, can be disabled, and never stores the passphrase.
 - **Clipboard.** The app does not copy note content or passphrases to the
   clipboard. (File *paths* shown after export are user-selectable text, which the
   user may copy deliberately.)

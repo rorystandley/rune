@@ -27,6 +27,7 @@ audio_tmp/
 **/*.p12
 **/*.mobileprovision
 **/*.cer
+app/macos/Runner/Configs/LocalSigning.xcconfig
 
 # Raw store-screenshot captures (regenerate with app/tool/screenshots/*.sh)
 **/screenshots/

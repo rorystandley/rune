@@ -51,6 +51,9 @@ Both are expected to report **no issues**.
 - Unlock with the correct passphrase succeeds; **unlock with the wrong
   passphrase throws and stays locked**.
 - A brand-new service instance can unlock an existing vault (real persistence).
+- A platform-cached DEK can reopen the vault without storing the passphrase;
+  malformed cached keys are rejected, and exported DEK bytes are defensive
+  copies.
 - `sealNote`/`openNote` round-trip while unlocked; throw `VaultLockedException`
   when locked.
 - **Change passphrase**: the old one stops working, the new one works, a wrong
@@ -86,6 +89,9 @@ Both are expected to report **no issues**.
 - Create / save / search / delete a note through the controller.
 - Lock; **wrong passphrase rejected (stays locked, sets error)**; correct
   passphrase unlocks and reloads notes.
+- Biometric / OS unlock remains unavailable until explicitly enabled, reopens
+  the vault through the cached DEK once enabled, clears the cache when disabled,
+  and refreshes the cache binding after a passphrase change.
 - Encrypted backup export contains no plaintext.
 - Plaintext export requires confirmation.
 
@@ -114,4 +120,7 @@ Both are expected to report **no issues**.
 - Real whisper.cpp transcription in the default CI run; it is available as an
   opt-in integration test, see `docs/transcription.md`.
 - Per-platform file-permission behaviour of the vault directory.
+- Real Face ID / Touch ID / Windows Hello prompts in CI; controller behavior is
+  tested with an in-memory fake, including automatic locked-session invocation
+  and duplicate-prompt prevention, while native prompts require device testing.
 - Fuzzing of the `vault.json` / backup parsers (on the roadmap).

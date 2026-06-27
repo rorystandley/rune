@@ -70,6 +70,8 @@
 		<false/>
 		<key>NSMicrophoneUsageDescription</key>
 		<string>Rune uses the microphone only to record voice notes. Audio stays on your device and is never uploaded.</string>
+		<key>NSFaceIDUsageDescription</key>
+		<string>Rune uses Face ID only when you opt in to unlock your local vault with this device.</string>
 		<!-- The app uses standard encryption (AES / Argon2id) to protect notes on-device,
 		     which qualifies for the U.S. export-compliance exemption. Setting this to false
 		     lets App Store / TestFlight uploads skip the manual encryption question.

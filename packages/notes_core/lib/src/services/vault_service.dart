@@ -61,6 +61,31 @@ class VaultService {
     _meta = meta;
   }
 
+  /// Returns a defensive copy of the in-memory DEK for an already-authenticated
+  /// platform unlock cache. This is intentionally only available while the
+  /// vault is unlocked; callers must store it behind OS authentication and wipe
+  /// their copy after use.
+  Uint8List exportDekForPlatformUnlockCache() =>
+      Uint8List.fromList(_requireDek());
+
+  /// Unlocks with a DEK returned by a platform-authenticated cache.
+  ///
+  /// This does not derive or bypass the passphrase KEK path. It only imports a
+  /// vault DEK that was previously exported while the vault was unlocked and
+  /// stored behind a platform keystore/keychain gate.
+  Future<void> unlockWithPlatformCachedDek(List<int> cachedDek) async {
+    if (cachedDek.length != CryptoService.dekLength) {
+      throw const UnsupportedVaultException(
+          'Cached platform unlock key has an invalid length.');
+    }
+    final meta = await store.readMetadata();
+    final nextDek = Uint8List.fromList(cachedDek);
+    final previous = _dek;
+    if (previous != null) _zero(previous);
+    _dek = nextDek;
+    _meta = meta;
+  }
+
   /// Drops and zeroes all in-memory secret state.
   void lock() {
     final dek = _dek;

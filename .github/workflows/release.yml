@@ -151,6 +151,17 @@ jobs:
               -C build/linux/x64/release/bundle -cf - . \
             | gzip -n > dist/rune-linux-x64.tar.gz
 
+      # Keychain Sharing requires a provisioned development/distribution
+      # signature. Preserve the real release entitlements for the later
+      # Developer ID signing step, but strip that capability while producing
+      # the deliberately ad-hoc intermediate/test artifact.
+      - name: Prepare macOS ad-hoc build
+        if: matrix.target == 'macos'
+        run: |
+          cp macos/Runner/Release.entitlements "$RUNNER_TEMP/RuneRelease.entitlements"
+          /usr/libexec/PlistBuddy -c "Delete :keychain-access-groups" \
+            macos/Runner/Release.entitlements
+
       - name: Build macOS
         if: matrix.target == 'macos'
         run: flutter build macos --release
@@ -200,7 +211,7 @@ jobs:
           echo "Signing as: $IDENTITY"
           # 3. Codesign with hardened runtime + the existing release entitlements.
           codesign --force --deep --options runtime --timestamp \
-            --entitlements macos/Runner/Release.entitlements \
+            --entitlements "$RUNNER_TEMP/RuneRelease.entitlements" \
             --sign "$IDENTITY" "$APP"
           codesign --verify --strict --verbose=2 "$APP"
           # 4. Notarize (submit a zip, wait for Apple's verdict).
