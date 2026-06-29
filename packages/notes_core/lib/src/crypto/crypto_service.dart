@@ -26,8 +26,7 @@ enum VaultCipher {
 
   static VaultCipher fromId(String id) => VaultCipher.values.firstWhere(
         (c) => c.id == id,
-        orElse: () =>
-            throw UnsupportedVaultException('Unknown cipher: $id'),
+        orElse: () => throw UnsupportedVaultException('Unknown cipher: $id'),
       );
 
   Cipher algorithm() => switch (this) {
@@ -47,6 +46,8 @@ enum VaultCipher {
 class CryptoService {
   CryptoService({this.cipher = VaultCipher.xchacha20poly1305});
 
+  static const int dekLength = 32;
+
   final VaultCipher cipher;
 
   /// Cryptographically secure RNG (delegates to the platform CSPRNG).
@@ -64,7 +65,7 @@ class CryptoService {
   }
 
   /// A fresh random 32-byte data-encryption key.
-  Uint8List generateDek() => randomBytes(32);
+  Uint8List generateDek() => randomBytes(dekLength);
 
   /// Fresh KDF parameters with a new random salt. Production defaults are used
   /// unless overridden (tests use cheap params for speed).
@@ -108,7 +109,8 @@ class CryptoService {
 
   /// Decrypts data produced by [seal]. Throws [DecryptionFailedException] when
   /// authentication fails (wrong key or tampering).
-  Future<Uint8List> open(List<int> sealed, List<int> key, {String? label}) async {
+  Future<Uint8List> open(List<int> sealed, List<int> key,
+      {String? label}) async {
     final box = SecretBox.fromConcatenation(
       sealed,
       nonceLength: _aead.nonceLength,

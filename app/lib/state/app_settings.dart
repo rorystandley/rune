@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+const Object _unchanged = Object();
+
 /// Non-sensitive application preferences.
 ///
 /// Stored UNENCRYPTED in `settings.json` because it contains no secrets — only
@@ -11,6 +13,8 @@ class AppSettings {
     this.autoLockMinutes = 5,
     this.lockOnBackground = true,
     this.keepAudioByDefault = false,
+    this.biometricUnlockEnabled = false,
+    this.biometricUnlockVaultBinding,
   });
 
   /// Inactivity timeout before auto-lock. 0 disables the timer.
@@ -23,28 +27,45 @@ class AppSettings {
   /// (privacy-first: discard the recording).
   final bool keepAudioByDefault;
 
+  /// Opt-in toggle for caching the vault DEK behind platform authentication.
+  final bool biometricUnlockEnabled;
+
+  /// Non-secret binding for the vault header the cached DEK belongs to.
+  final String? biometricUnlockVaultBinding;
+
   AppSettings copyWith({
     int? autoLockMinutes,
     bool? lockOnBackground,
     bool? keepAudioByDefault,
-  }) =>
-      AppSettings(
-        autoLockMinutes: autoLockMinutes ?? this.autoLockMinutes,
-        lockOnBackground: lockOnBackground ?? this.lockOnBackground,
-        keepAudioByDefault: keepAudioByDefault ?? this.keepAudioByDefault,
-      );
+    bool? biometricUnlockEnabled,
+    Object? biometricUnlockVaultBinding = _unchanged,
+  }) => AppSettings(
+    autoLockMinutes: autoLockMinutes ?? this.autoLockMinutes,
+    lockOnBackground: lockOnBackground ?? this.lockOnBackground,
+    keepAudioByDefault: keepAudioByDefault ?? this.keepAudioByDefault,
+    biometricUnlockEnabled:
+        biometricUnlockEnabled ?? this.biometricUnlockEnabled,
+    biometricUnlockVaultBinding:
+        identical(biometricUnlockVaultBinding, _unchanged)
+        ? this.biometricUnlockVaultBinding
+        : biometricUnlockVaultBinding as String?,
+  );
 
   Map<String, dynamic> toJson() => {
-        'autoLockMinutes': autoLockMinutes,
-        'lockOnBackground': lockOnBackground,
-        'keepAudioByDefault': keepAudioByDefault,
-      };
+    'autoLockMinutes': autoLockMinutes,
+    'lockOnBackground': lockOnBackground,
+    'keepAudioByDefault': keepAudioByDefault,
+    'biometricUnlockEnabled': biometricUnlockEnabled,
+    'biometricUnlockVaultBinding': biometricUnlockVaultBinding,
+  };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
-        autoLockMinutes: (json['autoLockMinutes'] as int?) ?? 5,
-        lockOnBackground: (json['lockOnBackground'] as bool?) ?? true,
-        keepAudioByDefault: (json['keepAudioByDefault'] as bool?) ?? false,
-      );
+    autoLockMinutes: (json['autoLockMinutes'] as int?) ?? 5,
+    lockOnBackground: (json['lockOnBackground'] as bool?) ?? true,
+    keepAudioByDefault: (json['keepAudioByDefault'] as bool?) ?? false,
+    biometricUnlockEnabled: (json['biometricUnlockEnabled'] as bool?) ?? false,
+    biometricUnlockVaultBinding: json['biometricUnlockVaultBinding'] as String?,
+  );
 }
 
 /// Reads/writes [AppSettings] to a JSON file. Tolerant of a missing/corrupt
@@ -59,7 +80,8 @@ class SettingsStore {
     try {
       if (!await file.exists()) return const AppSettings();
       return AppSettings.fromJson(
-          jsonDecode(await file.readAsString()) as Map<String, dynamic>);
+        jsonDecode(await file.readAsString()) as Map<String, dynamic>,
+      );
     } catch (_) {
       return const AppSettings();
     }

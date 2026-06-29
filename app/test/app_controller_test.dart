@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/platform/audio_recorder.dart';
+import 'package:notes_app/platform/biometric_unlock_store.dart';
 import 'package:notes_app/state/app_controller.dart';
 import 'package:notes_app/state/app_settings.dart';
 import 'package:notes_core/notes_core.dart';
@@ -10,7 +12,9 @@ void main() {
   late Directory root;
   late AppController controller;
 
-  Future<AppController> buildController() async {
+  Future<AppController> buildController({
+    BiometricUnlockStore? biometricUnlockStore,
+  }) async {
     final store = SettingsStore(File('${root.path}/settings.json'));
     // Disable auto-lock in tests so no Timer is left pending.
     await store.save(const AppSettings(autoLockMinutes: 0));
@@ -21,9 +25,13 @@ void main() {
       settingsStore: store,
       transcription: const StubTranscriptionService(),
       recorder: const UnavailableAudioRecorder(),
+      biometricUnlockStore: biometricUnlockStore,
       // Cheap KDF so tests are fast.
-      createKdfParams: CryptoService()
-          .newKdfParams(memoryKiB: 256, iterations: 1, parallelism: 1),
+      createKdfParams: CryptoService().newKdfParams(
+        memoryKiB: 256,
+        iterations: 1,
+        parallelism: 1,
+      ),
     );
     await c.init();
     return c;
@@ -82,6 +90,82 @@ void main() {
     expect(controller.visibleNotes.length, 1);
   });
 
+  test('biometric unlock is unavailable until explicitly enabled', () async {
+    final biometrics = MemoryBiometricUnlockStore();
+    controller.dispose();
+    controller = await buildController(biometricUnlockStore: biometrics);
+
+    await controller.createVault('passphrase123');
+    await controller.newNote();
+    controller.lock();
+
+    expect(controller.settings.biometricUnlockEnabled, isFalse);
+    expect(controller.canUnlockWithBiometric, isFalse);
+    expect(await controller.unlockWithBiometric(), isFalse);
+    expect(controller.phase, AppPhase.locked);
+  });
+
+  test('enabled biometric unlock reopens the vault with cached DEK', () async {
+    final biometrics = MemoryBiometricUnlockStore();
+    controller.dispose();
+    controller = await buildController(biometricUnlockStore: biometrics);
+
+    await controller.createVault('passphrase123');
+    final note = await controller.newNote();
+    await controller.saveNote(note.id, title: 'Cached', body: 'secret');
+
+    expect(await controller.enableBiometricUnlock(), isTrue);
+    expect(controller.settings.biometricUnlockEnabled, isTrue);
+
+    controller.lock();
+    expect(controller.canUnlockWithBiometric, isTrue);
+
+    expect(await controller.unlockWithBiometric(), isTrue);
+    expect(controller.phase, AppPhase.unlocked);
+    expect(controller.visibleNotes.single.title, 'Cached');
+  });
+
+  test('disabling biometric unlock clears the cached DEK', () async {
+    final biometrics = MemoryBiometricUnlockStore();
+    controller.dispose();
+    controller = await buildController(biometricUnlockStore: biometrics);
+
+    await controller.createVault('passphrase123');
+    expect(await controller.enableBiometricUnlock(), isTrue);
+    expect(biometrics.hasCachedDek, isTrue);
+
+    await controller.disableBiometricUnlock();
+    controller.lock();
+
+    expect(biometrics.hasCachedDek, isFalse);
+    expect(controller.settings.biometricUnlockEnabled, isFalse);
+    expect(controller.canUnlockWithBiometric, isFalse);
+  });
+
+  test(
+    'passphrase change keeps enabled biometric unlock bound to new header',
+    () async {
+      final biometrics = MemoryBiometricUnlockStore();
+      controller.dispose();
+      controller = await buildController(biometricUnlockStore: biometrics);
+
+      await controller.createVault('old-passphrase');
+      final note = await controller.newNote();
+      await controller.saveNote(note.id, title: 'Still here', body: 'body');
+      expect(await controller.enableBiometricUnlock(), isTrue);
+      final firstBinding = controller.settings.biometricUnlockVaultBinding;
+
+      await controller.changePassphrase('old-passphrase', 'new-passphrase');
+      final nextBinding = controller.settings.biometricUnlockVaultBinding;
+      expect(nextBinding, isNotNull);
+      expect(nextBinding, isNot(firstBinding));
+
+      controller.lock();
+      expect(await controller.unlockWithBiometric(), isTrue);
+      expect(controller.visibleNotes.single.title, 'Still here');
+    },
+  );
+
   test('encrypted backup contains no plaintext', () async {
     await controller.createVault('passphrase123');
     final note = await controller.newNote();
@@ -97,4 +181,46 @@ void main() {
       throwsA(isA<PlaintextExportNotConfirmedException>()),
     );
   });
+}
+
+class MemoryBiometricUnlockStore implements BiometricUnlockStore {
+  String? _vaultBinding;
+  Uint8List? _dek;
+
+  bool get hasCachedDek => _dek != null;
+
+  @override
+  Future<BiometricUnlockAvailability> checkAvailability() async =>
+      const BiometricUnlockAvailability.available('Test biometrics');
+
+  @override
+  Future<void> clearCachedDek() async {
+    _zero(_dek);
+    _vaultBinding = null;
+    _dek = null;
+  }
+
+  @override
+  Future<Uint8List?> readCachedDek({required String vaultBinding}) async {
+    final dek = _dek;
+    if (_vaultBinding != vaultBinding || dek == null) return null;
+    return Uint8List.fromList(dek);
+  }
+
+  @override
+  Future<void> saveCachedDek({
+    required String vaultBinding,
+    required Uint8List dek,
+  }) async {
+    _zero(_dek);
+    _vaultBinding = vaultBinding;
+    _dek = Uint8List.fromList(dek);
+  }
+
+  void _zero(Uint8List? bytes) {
+    if (bytes == null) return;
+    for (var i = 0; i < bytes.length; i++) {
+      bytes[i] = 0;
+    }
+  }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'app.dart';
 import 'platform/app_paths.dart';
 import 'platform/audio_recorder.dart';
+import 'platform/biometric_unlock_store.dart';
 import 'platform/transcription_factory.dart';
 import 'state/app_controller.dart';
 import 'state/app_settings.dart';
@@ -19,6 +20,7 @@ Future<void> main() async {
     settingsStore: SettingsStore(paths.settingsFile),
     transcription: transcription,
     recorder: RecordAudioRecorder(),
+    biometricUnlockStore: PlatformBiometricUnlockStore(),
   );
   await controller.init();
 

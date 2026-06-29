@@ -57,7 +57,44 @@ void main() {
   test('unlock with WRONG passphrase throws and stays locked', () async {
     await vault.createVault('s3cret', kdfParams: cheap());
     vault.lock();
-    expect(() => vault.unlock('wrong'), throwsA(isA<WrongPassphraseException>()));
+    expect(
+        () => vault.unlock('wrong'), throwsA(isA<WrongPassphraseException>()));
+    expect(vault.isUnlocked, isFalse);
+  });
+
+  test('platform cached DEK unlocks without storing the passphrase', () async {
+    await vault.createVault('s3cret', kdfParams: cheap());
+    final sealed = await vault.sealNote(utf8.encode('cached unlock note'));
+    final cachedDek = vault.exportDekForPlatformUnlockCache();
+    vault.lock();
+
+    final fresh = VaultService(store: FileVaultStore(dir));
+    await fresh.unlockWithPlatformCachedDek(cachedDek);
+
+    expect(fresh.isUnlocked, isTrue);
+    expect(await fresh.openNote(sealed),
+        equals(Uint8List.fromList(utf8.encode('cached unlock note'))));
+  });
+
+  test('exported cached DEK is a defensive copy', () async {
+    await vault.createVault('s3cret', kdfParams: cheap());
+    final cachedDek = vault.exportDekForPlatformUnlockCache();
+    cachedDek.fillRange(0, cachedDek.length, 0);
+
+    final sealed = await vault.sealNote(utf8.encode('still unlocked'));
+
+    expect(await vault.openNote(sealed),
+        equals(Uint8List.fromList(utf8.encode('still unlocked'))));
+  });
+
+  test('platform cached DEK rejects malformed key length', () async {
+    await vault.createVault('s3cret', kdfParams: cheap());
+    vault.lock();
+
+    expect(
+      () => vault.unlockWithPlatformCachedDek([1, 2, 3]),
+      throwsA(isA<UnsupportedVaultException>()),
+    );
     expect(vault.isUnlocked, isFalse);
   });
 
@@ -79,14 +116,16 @@ void main() {
   test('sealNote throws VaultLockedException when locked', () async {
     await vault.createVault('pw', kdfParams: cheap());
     vault.lock();
-    expect(() => vault.sealNote([1, 2, 3]), throwsA(isA<VaultLockedException>()));
+    expect(
+        () => vault.sealNote([1, 2, 3]), throwsA(isA<VaultLockedException>()));
   });
 
   test('changePassphrase: old stops working, new works', () async {
     await vault.createVault('old-pass', kdfParams: cheap());
     await vault.changePassphrase('old-pass', 'new-pass');
     vault.lock();
-    expect(() => vault.unlock('old-pass'), throwsA(isA<WrongPassphraseException>()));
+    expect(() => vault.unlock('old-pass'),
+        throwsA(isA<WrongPassphraseException>()));
     await vault.unlock('new-pass');
     expect(vault.isUnlocked, isTrue);
   });

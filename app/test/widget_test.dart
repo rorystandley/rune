@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/app.dart';
 import 'package:notes_app/platform/audio_recorder.dart';
+import 'package:notes_app/platform/biometric_unlock_store.dart';
 import 'package:notes_app/state/app_controller.dart';
 import 'package:notes_app/state/app_scope.dart';
 import 'package:notes_app/state/app_settings.dart';
@@ -14,7 +16,10 @@ import 'package:notes_core/notes_core.dart';
 // vault init, crypto) must run inside `tester.runAsync` — real I/O futures
 // never complete under the widget tester's fake-async clock.
 
-AppController _newController(Directory root) {
+AppController _newController(
+  Directory root, {
+  BiometricUnlockStore? biometricUnlockStore,
+}) {
   final store = SettingsStore(File('${root.path}/settings.json'));
   return AppController(
     vaultDir: Directory('${root.path}/vault'),
@@ -23,20 +28,27 @@ AppController _newController(Directory root) {
     settingsStore: store,
     transcription: const StubTranscriptionService(),
     recorder: const UnavailableAudioRecorder(),
-    createKdfParams:
-        CryptoService().newKdfParams(memoryKiB: 256, iterations: 1, parallelism: 1),
+    biometricUnlockStore: biometricUnlockStore,
+    createKdfParams: CryptoService().newKdfParams(
+      memoryKiB: 256,
+      iterations: 1,
+      parallelism: 1,
+    ),
   );
 }
 
 void main() {
-  testWidgets('first launch shows the create-vault screen with the warning',
-      (tester) async {
+  testWidgets('first launch shows the create-vault screen with the warning', (
+    tester,
+  ) async {
     late Directory root;
     late AppController controller;
     await tester.runAsync(() async {
       root = await Directory.systemTemp.createTemp('notes_widget_test_');
       controller = _newController(root);
-      await controller.settingsStore.save(const AppSettings(autoLockMinutes: 0));
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
       await controller.init();
     });
 
@@ -59,7 +71,9 @@ void main() {
     await tester.runAsync(() async {
       root = await Directory.systemTemp.createTemp('notes_widget_test_');
       controller = _newController(root);
-      await controller.settingsStore.save(const AppSettings(autoLockMinutes: 0));
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
       await controller.init();
     });
 
@@ -83,14 +97,17 @@ void main() {
     });
   });
 
-  testWidgets('tapping the new-note button creates a visible note',
-      (tester) async {
+  testWidgets('tapping the new-note button creates a visible note', (
+    tester,
+  ) async {
     late Directory root;
     late AppController controller;
     await tester.runAsync(() async {
       root = await Directory.systemTemp.createTemp('notes_widget_test_');
       controller = _newController(root);
-      await controller.settingsStore.save(const AppSettings(autoLockMinutes: 0));
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
       await controller.init();
       await controller.createVault('passphrase123');
     });
@@ -105,8 +122,9 @@ void main() {
     // Let the async create (crypto + file write) settle, draining both the
     // real event loop and the test's fake-async queue.
     for (var i = 0; i < 40 && controller.repo.count == 0; i++) {
-      await tester
-          .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 25)));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
       await tester.pump();
     }
     await tester.pumpAndSettle();
@@ -120,15 +138,107 @@ void main() {
     });
   });
 
-  testWidgets('editor insert handle appends a transcript into the open note',
-      (tester) async {
+  testWidgets('enabled biometric unlock runs automatically when locked', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    final biometrics = WidgetBiometricUnlockStore();
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_biometric_test_');
+      controller = _newController(root, biometricUnlockStore: biometrics);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      final note = await controller.newNote();
+      await controller.saveNote(note.id, title: 'Automatic', body: 'unlock');
+      expect(await controller.enableBiometricUnlock(), isTrue);
+      controller.lock();
+    });
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pump();
+
+    for (var i = 0; i < 40 && controller.phase != AppPhase.unlocked; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    expect(biometrics.readCount, 1);
+    expect(controller.phase, AppPhase.unlocked);
+    expect(find.text('Automatic'), findsWidgets);
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
+  testWidgets('automatic biometric failure does not create a prompt loop', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    final biometrics = WidgetBiometricUnlockStore();
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_biometric_test_');
+      controller = _newController(root, biometricUnlockStore: biometrics);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      expect(await controller.enableBiometricUnlock(), isTrue);
+      biometrics.failReads = true;
+      controller.lock();
+    });
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pump();
+
+    for (var i = 0; i < 40 && controller.busy; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    expect(biometrics.readCount, 1);
+    expect(controller.phase, AppPhase.locked);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(biometrics.readCount, 1);
+    expect(find.byKey(const Key('biometric-unlock-button')), findsOneWidget);
+    expect(find.byKey(const Key('unlock-pass')), findsOneWidget);
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
+  testWidgets('editor insert handle appends a transcript into the open note', (
+    tester,
+  ) async {
     late Directory root;
     late AppController controller;
     late Note note;
     await tester.runAsync(() async {
       root = await Directory.systemTemp.createTemp('notes_editor_test_');
       controller = _newController(root);
-      await controller.settingsStore.save(const AppSettings(autoLockMinutes: 0));
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
       await controller.init();
       await controller.createVault('passphrase123');
       note = await controller.newNote();
@@ -163,4 +273,39 @@ void main() {
       if (await root.exists()) await root.delete(recursive: true);
     });
   });
+}
+
+class WidgetBiometricUnlockStore implements BiometricUnlockStore {
+  String? _vaultBinding;
+  Uint8List? _dek;
+  int readCount = 0;
+  bool failReads = false;
+
+  @override
+  Future<BiometricUnlockAvailability> checkAvailability() async =>
+      const BiometricUnlockAvailability.available('Test biometrics');
+
+  @override
+  Future<void> clearCachedDek() async {
+    _vaultBinding = null;
+    _dek = null;
+  }
+
+  @override
+  Future<Uint8List?> readCachedDek({required String vaultBinding}) async {
+    readCount++;
+    if (failReads) throw StateError('Biometric prompt canceled.');
+    final dek = _dek;
+    if (_vaultBinding != vaultBinding || dek == null) return null;
+    return Uint8List.fromList(dek);
+  }
+
+  @override
+  Future<void> saveCachedDek({
+    required String vaultBinding,
+    required Uint8List dek,
+  }) async {
+    _vaultBinding = vaultBinding;
+    _dek = Uint8List.fromList(dek);
+  }
 }
