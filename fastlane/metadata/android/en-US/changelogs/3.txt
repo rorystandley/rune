@@ -1,0 +1,9 @@
+Optional biometric unlock.
+
+* Opt in to unlock your vault with Android strong biometrics (fingerprint /
+  face) instead of typing your passphrase every time.
+* The passphrase is never stored — only the in-memory vault key is cached
+  behind the biometric prompt, and passphrase unlock keeps working as before.
+* The OS authentication prompt now starts automatically on each locked session.
+
+Still fully offline: no network, no telemetry, no accounts. Not yet audited.
