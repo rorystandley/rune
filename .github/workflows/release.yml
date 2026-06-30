@@ -139,6 +139,39 @@ jobs:
             --android-project-arg=filesystem-scheme=org-dartlang-root
           cp build/app/outputs/bundle/release/app-release.aab dist/rune-android.aab
 
+      # Optional: publish the signed AAB to Google Play. Gated on the
+      # PLAY_SERVICE_ACCOUNT_JSON secret (a Play Console service-account key) and
+      # only on version-tag pushes. If the secret is absent the step is a no-op and
+      # the build still succeeds. Defaults to the `internal` track; promote to
+      # production from the Play Console (or change `--track` to `production` and
+      # `--release_status` to `draft`). Uses fastlane supply (a Ruby gem, no GitHub
+      # Action) so it doesn't trip the repo's SHA-pinning ruleset; it reads the
+      # in-repo fastlane/metadata for the matching changelog and uploads only the
+      # binary + release notes (listing text/images are left untouched).
+      - name: Publish to Google Play (internal track)
+        if: matrix.target == 'android' && startsWith(github.ref, 'refs/tags/v')
+        working-directory: ${{ github.workspace }}
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "no PLAY_SERVICE_ACCOUNT_JSON secret; skipping Play upload"
+            exit 0
+          fi
+          JSON="$RUNNER_TEMP/play-service-account.json"
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > "$JSON"
+          gem install fastlane --no-document
+          fastlane supply \
+            --aab app/dist/rune-android.aab \
+            --track internal \
+            --release_status completed \
+            --json_key "$JSON" \
+            --package_name co.rorystandley.rune \
+            --skip_upload_apk true \
+            --skip_upload_metadata true \
+            --skip_upload_images true \
+            --skip_upload_screenshots true
+
       - name: Build Linux
         if: matrix.target == 'linux'
         run: |

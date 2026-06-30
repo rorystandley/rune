@@ -1,6 +1,9 @@
 # Rune — a private, local-first, encrypted notes app
 
 [![CI](https://github.com/rorystandley/rune/actions/workflows/ci.yml/badge.svg)](https://github.com/rorystandley/rune/actions/workflows/ci.yml)
+[![Get it on Google Play](https://img.shields.io/badge/Google_Play-Download-E8B520?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=co.rorystandley.rune)
+
+> **Now on Google Play:** [co.rorystandley.rune](https://play.google.com/store/apps/details?id=co.rorystandley.rune)
 
 <p align="center"><img src="docs/assets/screenshot-home.png" width="300" alt="Rune — encrypted notes list"></p>
 
