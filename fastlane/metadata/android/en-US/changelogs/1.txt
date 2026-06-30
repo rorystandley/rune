@@ -1,4 +1,4 @@
-First public build (MVP).
+Initial public build (MVP).
 
 * Encrypted vault: Argon2id + XChaCha20-Poly1305, only ciphertext at rest.
 * Create, edit, search, and delete notes; autosave.
