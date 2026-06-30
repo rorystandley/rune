@@ -154,6 +154,26 @@ Signs the `.aab`/`.apk` with your upload keystore instead of the debug key.
 | `ANDROID_KEY_PASSWORD` | The key's password (often the same as the store password). |
 | `ANDROID_KEY_ALIAS` | The key alias (e.g. `upload`). |
 
+### Android (Google Play auto-publish) — 1 secret
+
+Once the app exists on Google Play (the first upload is manual), this makes every
+version-tag release upload the signed `.aab` to the **internal** track
+automatically via `fastlane supply` (a Ruby gem — no GitHub Action, so it doesn't
+trip the SHA-pinning ruleset). If the secret is absent the step is a no-op and the
+build still succeeds. The step only uploads the binary and the matching
+`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` release notes; it
+leaves the live store listing (title, descriptions, images) untouched.
+
+| Secret | How to produce it |
+|--------|-------------------|
+| `PLAY_SERVICE_ACCOUNT_JSON` | Play Console → **Setup → API access** → link/create a Google Cloud project → create a **service account** → grant it the **Release manager** role (or app-scoped release permissions) → **Keys → Add key → JSON** → paste the downloaded JSON as the secret value. |
+
+The build number (`+N` in `app/pubspec.yaml`) must increase for every upload;
+Google Play rejects a duplicate `versionCode`. To promote automatically to
+production instead of internal, change the `Publish to Google Play` step's
+`--track` to `production` and `--release_status` to `draft` (review in the console
+before going live).
+
 ### macOS (Developer ID signing + notarization) — 5 secrets
 
 Signs `Rune.app` with a Developer ID Application cert + hardened runtime, then
