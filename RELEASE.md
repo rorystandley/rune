@@ -52,17 +52,32 @@ must increase for every store upload. Consider obfuscating release binaries:
 
 ## iOS (App Store)
 
-Requires the Apple Developer Program ($99/yr).
+Requires the Apple Developer Program ($99/yr). The app ships **iPhone-only**
+(`TARGETED_DEVICE_FAMILY = "1"` in `ios/Runner.xcodeproj/project.pbxproj`) so the
+submission needs only one iPhone screenshot set and isn't reviewed on iPad; add
+iPad support later by setting it back to `"1,2"` and providing iPad screenshots.
+The mic usage string (`NSMicrophoneUsageDescription`) and export-compliance flag
+(`ITSAppUsesNonExemptEncryption = false`) are already set, and the whisper static
+lib is force-loaded so on-device transcription survives the release archive.
 
-1. In Xcode (`open ios/Runner.xcworkspace`): set the team, confirm
-   `co.rorystandley.rune`, and create the App ID + app record in
-   App Store Connect.
-2. Confirm voice notes prompt for mic access (the `NSMicrophoneUsageDescription`
-   is set) and that `ITSAppUsesNonExemptEncryption` is correct for you.
-3. `flutter build ipa` → upload `build/ios/ipa/*.ipa` via Xcode Organizer or
-   `xcrun altool`/Transporter, then submit from App Store Connect.
-4. Listing: screenshots per device size, description, privacy "nutrition label"
-   (collects nothing), age rating.
+1. **App Store Connect** ([appstoreconnect.apple.com](https://appstoreconnect.apple.com)):
+   **Apps → + → New App** — iOS, name **Rune**, primary language, bundle ID
+   `co.rorystandley.rune`, an SKU (e.g. `rune-ios`). Xcode registers the App ID on
+   first archive if it doesn't exist yet.
+2. **Signing** — `open ios/Runner.xcworkspace`, select the **Runner** target →
+   **Signing & Capabilities** → tick **Automatically manage signing** and pick your
+   **Team**. Xcode provisions the distribution cert + App Store profile.
+3. **Build & upload** — `flutter build ipa` → `build/ios/ipa/Rune.ipa`. Upload with
+   the **Transporter** app or Xcode **Organizer → Distribute App**. Verify the
+   archive compiles first with `flutter build ipa --no-codesign` (no signing needed).
+4. **Listing** — iPhone 6.7" screenshots (1290×2796), description, keywords, support
+   URL, privacy policy URL (host `PRIVACY.md`), **App Privacy → Data Not Collected**,
+   age rating, Free pricing. Export compliance won't prompt for docs.
+5. **Submit** — optionally push to **TestFlight** for an on-device check, then
+   **Submit for Review** (first review is typically 1–3 days).
+
+The build number (`+N` in `app/pubspec.yaml`) must increase for every upload, the
+same as Android.
 
 ## Android (Google Play)
 
