@@ -92,7 +92,7 @@ class _UnlockScreenState extends State<UnlockScreen>
                 Icon(Icons.lock, size: 40, color: theme.colorScheme.primary),
                 const SizedBox(height: 16),
                 Text(
-                  'Notes is locked',
+                  'Rune is locked',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.headlineSmall,
                 ),
