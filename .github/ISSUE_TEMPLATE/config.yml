@@ -1,0 +1,10 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability (private)
+    url: https://github.com/rorystandley/rune/security/advisories/new
+    about: >
+      Please do NOT open a public issue for exploitable flaws. This opens a
+      private advisory visible only to you and the maintainer.
+  - name: Question or general discussion
+    url: https://github.com/rorystandley/rune/discussions
+    about: Ask questions or float ideas before they're concrete enough for an issue.

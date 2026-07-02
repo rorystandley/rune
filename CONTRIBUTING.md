@@ -35,6 +35,20 @@ cd app && flutter analyze && flutter test     # lints + app tests
 - **Reporting a vulnerability?** Do **not** open a public issue — follow the
   disclosure process in [SECURITY.md](SECURITY.md).
 
+## What the bots do
+
+A little automation keeps triage predictable — none of it replaces a human
+maintainer review:
+
+- **Auto-labelling:** PRs get `area: *` labels from the paths they touch.
+- **CodeRabbit** posts an automated first-pass review on PRs; it is tuned to be
+  strict about `packages/notes_core/` and the offline/no-telemetry posture.
+  Treat it as a helpful linter, not a gatekeeper.
+- **Dependabot** opens weekly grouped dependency-update PRs.
+- **Stale bot:** issues quiet for 60 days (PRs: 45) are marked `stale` and close
+  two weeks later unless there's activity. `security` and `pinned` are exempt.
+- **CI** (`analyze & test`) must pass before anything merges into `main`.
+
 ## Sign your commits (DCO)
 
 We use the [Developer Certificate of Origin](https://developercertificate.org/).

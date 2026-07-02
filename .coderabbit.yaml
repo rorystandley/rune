@@ -1,0 +1,34 @@
+# CodeRabbit configuration — https://docs.coderabbit.ai/reference/configuration
+# Rune is a privacy-first encrypted notes app: correctness and trust outrank
+# features, so reviews should be strict on the security-critical core.
+language: en-GB
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: packages/notes_core/**
+      instructions: >
+        Security-critical code (crypto, storage, vault state machine). Scrutinise
+        for: custom crypto (forbidden — primitives come from the `cryptography`
+        package only), nonce/salt reuse, key material that escapes zeroing,
+        secrets reaching logs or disk in the clear, and missing tests for any
+        behaviour change. Flag any new dependency.
+    - path: app/**
+      instructions: >
+        Thin Flutter UI layer. Flag any networking, telemetry, analytics, or
+        clipboard/plaintext-persistence of note content — the app must remain
+        fully offline. Watch for vault state being displayed while locked.
+    - path: .github/**
+      instructions: >
+        Every GitHub Action must be pinned to a full-length commit SHA (repo
+        ruleset blocks unpinned refs, including transitive composite actions).
+        Flag any new tag- or branch-pinned action reference.
+
+chat:
+  auto_reply: true

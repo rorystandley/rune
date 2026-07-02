@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest an idea. Check ROADMAP.md first — it may already be planned.
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the need, not just the solution — it helps find the best design.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: If you have a specific design in mind, sketch it here.
+  - type: checkboxes
+    id: posture
+    attributes:
+      label: Privacy posture
+      description: >
+        Rune is offline, encrypted, and telemetry-free by design (see
+        SECURITY.md). Features that weaken that posture will be declined.
+      options:
+        - label: >
+            This feature works fully offline and doesn't add telemetry,
+            accounts, or weaken the "only ciphertext at rest" invariant.
+          required: true
