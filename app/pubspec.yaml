@@ -18,7 +18,7 @@ dependencies:
   # Local microphone capture for voice notes. No network.
   # 7.x aligns all platform packages on record_platform_interface 2.x; older
   # 5.x resolves a stale record_linux that fails to compile on desktop builds.
-  record: ^7.0.0
+  record: ^7.1.1
   # Stores the optional cached vault key in the platform credential store.
   flutter_secure_storage: ^10.3.1
   # Drives Face ID / Touch ID / Windows Hello availability checks and prompts.
