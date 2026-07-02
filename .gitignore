@@ -31,3 +31,10 @@ app/macos/Runner/Configs/LocalSigning.xcconfig
 
 # Raw store-screenshot captures (regenerate with app/tool/screenshots/*.sh)
 **/screenshots/
+
+# ...except the curated App Store set that fastlane deliver uploads.
+!/fastlane/screenshots/
+!/fastlane/screenshots/**
+
+# The negation above re-includes everything, so re-assert Finder droppings.
+/fastlane/screenshots/**/.DS_Store
