@@ -1,0 +1,52 @@
+# Path-based auto-labelling config for .github/workflows/labeler.yml.
+"area: core":
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/notes_core/**
+
+"area: crypto":
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/notes_core/lib/src/crypto/**
+
+"area: app":
+  - changed-files:
+      - any-glob-to-any-file:
+          - app/lib/**
+          - app/test/**
+          - app/pubspec.yaml
+
+"area: android":
+  - changed-files:
+      - any-glob-to-any-file:
+          - app/android/**
+          - fastlane/metadata/android/**
+
+"area: ios":
+  - changed-files:
+      - any-glob-to-any-file:
+          - app/ios/**
+          - fastlane/screenshots/**
+
+"area: macos":
+  - changed-files:
+      - any-glob-to-any-file:
+          - app/macos/**
+
+"area: native":
+  - changed-files:
+      - any-glob-to-any-file:
+          - native/**
+          - third_party/**
+          - tool/whisper/**
+
+"area: ci":
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+
+"area: docs":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - docs/**

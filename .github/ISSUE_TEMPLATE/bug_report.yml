@@ -1,0 +1,66 @@
+name: Bug report
+description: Something isn't working the way it should.
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for the report. One thing before you start: if this bug has
+        **security implications** (crypto, unlock, data exposure), do not file
+        it here — use [private vulnerability
+        reporting](https://github.com/rorystandley/rune/security/advisories/new)
+        instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Also tell us what you expected to happen instead.
+      placeholder: The vault stayed unlocked after backgrounding the app...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Rune and unlock the vault
+        2. Switch to another app
+        3. Return to Rune
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Android
+        - iOS
+        - macOS
+        - Linux
+        - Windows
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Settings shows the version, e.g. 0.3.0.
+      placeholder: "0.3.0"
+    validations:
+      required: true
+  - type: input
+    id: install-source
+    attributes:
+      label: Install source
+      placeholder: Google Play / App Store / GitHub release / built from source
+  - type: checkboxes
+    id: no-sensitive
+    attributes:
+      label: Privacy check
+      options:
+        - label: >
+            This report contains no note content, passphrases, or other
+            sensitive personal data, and it is not an exploitable security
+            flaw (those go through private reporting).
+          required: true

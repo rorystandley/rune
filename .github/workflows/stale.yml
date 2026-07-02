@@ -1,0 +1,40 @@
+name: stale
+
+# Gentle triage: mark issues/PRs stale after a quiet period, close a while
+# later if still silent. Security reports and accepted work are exempt.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@eb5cf3af3ac0a1aa4c9c45633dd1ae542a27a899 # v10.3.0
+        with:
+          days-before-issue-stale: 60
+          days-before-issue-close: 14
+          days-before-pr-stale: 45
+          days-before-pr-close: 14
+          stale-issue-label: stale
+          stale-pr-label: stale
+          exempt-issue-labels: "security,pinned,good first issue,help wanted"
+          exempt-pr-labels: "security,pinned"
+          stale-issue-message: >
+            This issue has been quiet for 60 days. It will close in 14 days
+            unless there's more activity — a comment is enough to keep it open.
+          stale-pr-message: >
+            This pull request has been quiet for 45 days. It will close in 14
+            days unless there's more activity — a comment or push is enough to
+            keep it open.
+          close-issue-message: >
+            Closed for inactivity. If this is still relevant, feel free to
+            reopen or file a fresh issue with up-to-date details.
+          close-pr-message: >
+            Closed for inactivity. If you'd like to pick this back up, reopen
+            or open a new PR — happy to review.

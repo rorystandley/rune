@@ -1,0 +1,5 @@
+# Default owner for everything — review requests are assigned automatically.
+* @rorystandley
+
+# Security-critical code: crypto, storage, vault state machine.
+/packages/notes_core/ @rorystandley
