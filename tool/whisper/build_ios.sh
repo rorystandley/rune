@@ -7,6 +7,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." >/dev/null 2>&1 && pwd -P)
 APP_DIR="$ROOT_DIR/app"
 SOURCE_DIR="${WHISPER_CPP_SOURCE_DIR:-$ROOT_DIR/third_party/whisper.cpp}"
 
+# Put Homebrew's cmake/ninja on PATH for GUI build phases (see the helper).
+source "$(dirname "${BASH_SOURCE[0]}")/homebrew_path.sh"
+
 if ! command -v cmake >/dev/null 2>&1; then
   echo "error: cmake is required to build whisper.cpp from source." >&2
   echo "Install cmake, then rebuild the iOS app." >&2
