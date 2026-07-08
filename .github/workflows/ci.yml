@@ -57,6 +57,16 @@ jobs:
         run: dart test
 
       # --- app: thin Flutter UI layer ---
+      # The version shown in Settings is generated from app/pubspec.yaml. Fail
+      # loudly if the committed generated file drifted from the pubspec, so a
+      # forgotten `dart run tool/gen_app_version.dart` can never ship a wrong
+      # version string.
+      - name: App — check generated version is in sync
+        run: |
+          dart run tool/gen_app_version.dart
+          git diff --exit-code app/lib/app_version.g.dart \
+            || { echo "::error::app/lib/app_version.g.dart is stale — run: dart run tool/gen_app_version.dart"; exit 1; }
+
       - name: App — get dependencies
         working-directory: app
         run: flutter pub get

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:notes_core/notes_core.dart';
 
+import '../../app_version.g.dart';
 import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 import '../widgets/dialogs.dart';
-
-const String kAppVersion = '0.1.0 (MVP)';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -90,8 +89,10 @@ class SettingsScreen extends StatelessWidget {
             leading: const Icon(Icons.record_voice_over_outlined),
             title: const Text('Transcription engine'),
             subtitle: Text(
-              '${controller.transcription.engineName}'
-              '${controller.transcription.isLocal ? ' · on-device' : ''}',
+              controller.transcription == null
+                  ? 'Not available on this platform'
+                  : '${controller.transcription!.engineName}'
+                        '${controller.transcription!.isLocal ? ' · on-device' : ''}',
             ),
           ),
           _section(context, 'Backup & export'),
@@ -118,7 +119,7 @@ class SettingsScreen extends StatelessWidget {
           const ListTile(
             leading: Icon(Icons.info_outline),
             title: Text('Version'),
-            subtitle: Text(kAppVersion),
+            subtitle: Text(kAppVersionDisplay),
           ),
           const ListTile(
             leading: Icon(Icons.verified_user_outlined),

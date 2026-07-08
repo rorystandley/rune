@@ -64,7 +64,11 @@ class _VoiceNoteSheetState extends State<_VoiceNoteSheet> {
   }
 
   Future<void> _check() async {
-    final supported = await _c.recorder.isSupported();
+    // Voice notes need both a working recorder and an on-device transcription
+    // engine. Platforms without a bundled engine (transcription == null) show
+    // the unsupported state rather than recording audio we can't transcribe.
+    final supported =
+        _c.transcription != null && await _c.recorder.isSupported();
     if (!mounted) return;
     setState(() => _stage = supported ? _Stage.idle : _Stage.unsupported);
   }
@@ -97,44 +101,65 @@ class _VoiceNoteSheetState extends State<_VoiceNoteSheet> {
     setState(() => _stage = _Stage.transcribing);
     final recordedPath = await _c.recorder.stop() ?? _audioPath;
 
+    final transcription = _c.transcription;
+    if (transcription == null) {
+      // Should be unreachable (the entry point is disabled), but never inject
+      // placeholder text if we somehow get here.
+      await _discardIfNeeded(recordedPath);
+      if (mounted) {
+        setState(() {
+          _stage = _Stage.failed;
+          _message =
+              'On-device transcription is not available on this platform.';
+        });
+      }
+      return;
+    }
+
     final appended = widget.onTranscribed != null;
-    var inserted = false;
-    var wasStub = false;
     try {
-      final result = await _c.transcription.transcribe(
+      final result = await transcription.transcribe(
         TranscriptionRequest(audioFilePath: recordedPath ?? '', languageHint: 'en'),
       );
-      wasStub = result.isStub;
       if (widget.onTranscribed != null) {
         widget.onTranscribed!(result.text);
       } else {
         final note = await _c.newNote();
         await _c.saveNote(note.id, title: 'Voice note', body: result.text);
       }
-      inserted = true;
 
-      if (!_keepAudio && recordedPath != null) {
-        final f = File(recordedPath);
-        if (await f.exists()) await f.delete();
-      }
-    } finally {
+      await _discardIfNeeded(recordedPath);
+
       if (mounted) {
         Navigator.of(context).pop();
+        final where = appended ? 'Added to note.' : 'Voice note added.';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_resultMessage(inserted, appended, wasStub))),
+          SnackBar(
+            content: Text(
+              '$where ${_keepAudio ? 'Audio kept locally.' : 'Audio discarded.'}',
+            ),
+          ),
         );
+      }
+    } catch (_) {
+      // On-device transcription failed to run. Surface an honest error rather
+      // than writing placeholder text into the note.
+      await _discardIfNeeded(recordedPath);
+      if (mounted) {
+        setState(() {
+          _stage = _Stage.failed;
+          _message =
+              'On-device transcription failed to run. Your recording was not '
+              'added.';
+        });
       }
     }
   }
 
-  String _resultMessage(bool inserted, bool appended, bool wasStub) {
-    if (!inserted) return 'Could not add the voice note.';
-    final where = appended ? 'Added to note.' : 'Voice note added.';
-    if (wasStub) {
-      return '$where Placeholder transcription — no on-device speech-to-text '
-          'on this platform yet.';
-    }
-    return '$where ${_keepAudio ? 'Audio kept locally.' : 'Audio discarded.'}';
+  Future<void> _discardIfNeeded(String? recordedPath) async {
+    if (_keepAudio || recordedPath == null) return;
+    final f = File(recordedPath);
+    if (await f.exists()) await f.delete();
   }
 
   @override
