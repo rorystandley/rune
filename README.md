@@ -1,59 +1,88 @@
-# Rune — a private, local-first, encrypted notes app
+# Rune
+
+**Private notes that never leave your device.** Rune keeps everything you write
+encrypted on your phone with a passphrase only you know — no account, no cloud,
+no sync, and not one network call. It feels like Apple Notes. It just doesn't
+trust anyone with your data, and neither should you.
 
 [![CI](https://github.com/rorystandley/rune/actions/workflows/ci.yml/badge.svg)](https://github.com/rorystandley/rune/actions/workflows/ci.yml)
-[![Get it on Google Play](https://img.shields.io/badge/Google_Play-Download-E8B520?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=co.rorystandley.rune)
-[![Download on the App Store](https://img.shields.io/badge/App_Store-Download-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/us/app/rune-secure-notes/id6786366361)
 
-> **Now on the stores:** [Google Play](https://play.google.com/store/apps/details?id=co.rorystandley.rune) · [App Store](https://apps.apple.com/us/app/rune-secure-notes/id6786366361)
+<p align="center">
+  <a href="https://apps.apple.com/us/app/rune-secure-notes/id6786366361"><img alt="Download on the App Store" height="52" src="docs/assets/badge-app-store.svg"></a>
+  &nbsp;&nbsp;
+  <a href="https://play.google.com/store/apps/details?id=co.rorystandley.rune"><img alt="Get it on Google Play" height="52" src="docs/assets/badge-google-play.png"></a>
+</p>
 
-<p align="center"><img src="docs/assets/screenshot-home.png" width="300" alt="Rune — encrypted notes list"></p>
+<p align="center">
+  <img src="docs/assets/ios-notes-list.png" width="230" alt="Rune's encrypted notes list on iPhone">
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/assets/ios-note.png" width="230" alt="A note in Rune, encrypted on-device">
+</p>
 
-A simple, fast, calm notes app in the spirit of Apple Notes, built for people
-who don't trust apps with their data. Notes never leave your device, are
-encrypted at rest with modern authenticated encryption, and the app makes **no
-network calls at all**.
+Open Rune and you get a calm, familiar notes app: a clean list, instant search,
+a distraction-free editor. The difference is underneath. Every note is sealed
+with authenticated encryption before it ever touches disk, so what's stored is
+ciphertext and nothing else. Lose your phone and your notes are unreadable.
+Forget your passphrase and not even the developer can get them back — there's no
+backdoor, because there's no server to hide one on.
 
-> **Status: working MVP.** Core vault engine, encryption, optional
-> biometric/OS unlock, notes CRUD, search, auto-lock, backup/export, and the
-> voice-note flow are implemented and tested. On-device speech-to-text is
-> implemented for macOS, Android, and iOS via whisper.cpp (Android and iOS
-> verified on physical devices). Windows and Linux have no on-device engine yet,
-> so the voice-note flow is disabled there rather than inserting placeholder
-> text. This is not audited
-> software — see [SECURITY.md](SECURITY.md) for honest limitations.
+Rather talk than type? Dictate a note and both the recording *and* the
+transcription run entirely on your device, using whisper.cpp. Your voice never
+leaves the phone either.
+
+> **Where it's at, honestly.** Rune is live on both stores and does what it says,
+> but it's young and **not independently audited**. It leans on standard,
+> well-reviewed cryptographic primitives — it implements none of its own — and
+> the security-critical code is small and tested on every commit. If you're
+> trusting it with high-stakes secrets, read [SECURITY.md](SECURITY.md) first: it
+> spells out exactly what Rune protects against and what it doesn't.
+
+## Why you'll like it
+
+- **Encrypted by default, always.** A key derived from your passphrase with
+  Argon2id, then XChaCha20-Poly1305 for every note. Only ciphertext reaches the
+  disk, and the tests prove it.
+- **No network, no accounts, no tracking.** No sign-up, no sync, no telemetry, no
+  analytics, no crash reporting. Rune makes no network calls at all — airplane
+  mode changes nothing.
+- **Unlock your way.** Your passphrase, optionally backed by Face ID, Touch ID,
+  or Windows Hello. Auto-locks when you're idle and when the app goes to the
+  background.
+- **Voice notes that stay put.** Record and transcribe locally with whisper.cpp.
+  No upload, no third-party speech API.
+- **Familiar and fast.** Two-pane on desktop, single-pane on mobile, with instant
+  local search. If you've used Apple Notes, you already know how to use Rune.
+- **Your data stays yours.** Encrypted backups you hold the key to, plus a
+  deliberately guarded plaintext export for when you really want one.
+- **Runs everywhere.** One codebase for iOS, Android, macOS, Windows, and Linux.
+- **Open and checkable.** GPLv3, reproducible Android builds, and releases signed
+  with cryptographic provenance anyone can verify.
 
 ---
 
-## Why this stack
+## Under the hood
 
-**Flutter + a pure-Dart core.** The brief asked for one maintainable codebase
-targeting macOS, Windows, Linux, iOS, and Android. Flutter is the least exotic
-way to get there for a solo developer: one language, one UI toolkit, five
-targets, no per-platform UI rewrites.
+**Flutter with a pure-Dart core.** One codebase covers all five platforms with no
+per-platform UI rewrites — but the decision that matters is the split beneath it:
 
-The important architectural decision is the split:
+- **`packages/notes_core/`** holds *all* the crypto, storage, and note logic in
+  **pure Dart**: no Flutter, no network, no logging of secrets. Because it never
+  imports Flutter, its tests run under plain `dart test` with no device,
+  emulator, or platform SDK. This is where the security lives, and where the
+  security tests run.
+- **`app/`** is a thin Flutter layer on top — screens, state, and platform glue
+  (file paths, microphone) and nothing more.
 
-- **`packages/notes_core/`** — a **pure-Dart** package (no Flutter, no network,
-  no logging of secrets) that contains *all* crypto, storage, and note logic.
-  Because it has no Flutter dependency, its tests run under plain `dart test`
-  with no device, emulator, or platform SDK. This is where the security lives
-  and where the security tests run.
-- **`app/`** — a thin Flutter UI layer that depends on `notes_core`. It owns
-  screens, state, and platform glue (file paths, microphone) only.
+Keeping the security-critical code small and Flutter-free makes it easy to audit,
+light on dependencies, and portable: it could just as well back a CLI or a server
+later without changing.
 
-This keeps the security-critical code small, dependency-light, auditable, and
-portable (it could back a CLI or a server later without changes).
-
-**Cryptography:** the [`cryptography`](https://pub.dev/packages/cryptography)
-package — a well-known, pure-Dart implementation of standard primitives. We use
-it for **Argon2id** (key derivation) and **XChaCha20-Poly1305** (authenticated
-encryption). We do **not** implement any cryptographic primitive ourselves.
-
-See [SECURITY.md](SECURITY.md) for the full crypto design and threat model.
-
----
-
-## How it works (architecture)
+**The cryptography** comes from the
+[`cryptography`](https://pub.dev/packages/cryptography) package — a well-known,
+pure-Dart implementation of standard primitives. Rune uses it for **Argon2id**
+(key derivation) and **XChaCha20-Poly1305** (authenticated encryption), and
+implements no cryptographic primitive of its own. Full design and threat model:
+[SECURITY.md](SECURITY.md).
 
 ### Envelope encryption
 
@@ -65,18 +94,18 @@ random 32-byte DEK (data key) ──encrypt with KEK─┘──▶ "wrapped key
 each note ──encrypt with DEK (XChaCha20-Poly1305, random nonce)──▶ .note file
 ```
 
-- The passphrase derives a **key-encryption key (KEK)** via Argon2id.
+- Your passphrase derives a **key-encryption key (KEK)** via Argon2id.
 - A random **data-encryption key (DEK)** is generated once per vault and stored
   only in *wrapped* (encrypted-under-KEK) form.
 - Notes are encrypted with the DEK.
-- **Changing the passphrase only re-wraps the DEK** — notes are never
-  re-encrypted, and the design never paints us into a corner.
+- **Changing your passphrase only re-wraps the DEK** — notes are never
+  re-encrypted, so the design never paints itself into a corner.
 - A **wrong passphrase** produces a wrong KEK, which fails the wrapped key's
-  authentication tag → unlock is rejected. (Proven by tests.)
+  authentication tag, and unlock is rejected. (Proven by tests.)
 - Optional biometric / OS unlock caches the DEK in this device's platform
-  credential store only after the user opts in. Once enabled, platform
-  authentication starts automatically on each locked session; the passphrase
-  path remains unchanged and always available.
+  credential store, and only after you opt in. Once enabled, platform
+  authentication starts automatically on each locked session; the passphrase path
+  is unchanged and always available.
 
 ### On-disk layout
 
@@ -91,7 +120,7 @@ each note ──encrypt with DEK (XChaCha20-Poly1305, random nonce)──▶ .no
 └── audio_tmp/            # transient voice recordings (deleted by default)
 ```
 
-Only ciphertext is ever written for note content. Writes are atomic
+Only ciphertext is ever written for note content, and writes are atomic
 (temp-file + rename) to survive crashes. See
 [what metadata remains visible](SECURITY.md#what-metadata-leaks).
 
@@ -103,7 +132,7 @@ Only ciphertext is ever written for note content. Writes are atomic
 | Models | `notes_core/src/models` | `Note`, `VaultMetadata`, `KdfParams` |
 | Storage | `notes_core/src/storage` | `VaultStore` interface + `FileVaultStore` |
 | Services | `notes_core/src/services` | `VaultService`, `NotesRepository`, `ExportService` |
-| Transcription | `notes_core/src/transcription` | `TranscriptionService`, WAV decode, whisper.cpp FFI + stub fallback |
+| Transcription | `notes_core/src/transcription` | `TranscriptionService`, WAV decode, whisper.cpp FFI (+ test-only stub) |
 | Platform glue | `app/lib/platform` | app paths, microphone, optional OS-keystore unlock |
 | State | `app/lib/state` | `AppController` (lock state machine, auto-lock) |
 | UI | `app/lib/ui` | create/unlock/home/editor/settings, voice sheet |
@@ -117,15 +146,14 @@ Only ciphertext is ever written for note content. Writes are atomic
 - Flutter SDK 3.44+ (Dart 3.12+). Install from <https://flutter.dev> or, on
   macOS, `brew install --cask flutter`.
 - For device/desktop builds you also need the platform toolchain (Xcode for
-  macOS/iOS, Android SDK for Android, GTK/CMake plus `libsecret-1-dev` for
-  Linux, Visual Studio for Windows). **None of these are needed to run the
-  tests.**
+  macOS/iOS, Android SDK for Android, GTK/CMake plus `libsecret-1-dev` for Linux,
+  Visual Studio for Windows). **None of these are needed to run the tests.**
 
 ### Get the source
 
-This repo vendors whisper.cpp as a git submodule for the on-device transcription
-native build (macOS/Android/iOS). Clone with submodules, or initialise them
-after a plain clone:
+Rune vendors whisper.cpp as a git submodule for the on-device transcription
+native build (macOS/Android/iOS). Clone with submodules, or initialise them after
+a plain clone:
 
 ```bash
 git clone --recurse-submodules https://github.com/rorystandley/rune.git
@@ -162,15 +190,15 @@ cd app
 flutter build macos         # or: ios, apk, appbundle, linux, windows
 ```
 
-> The app code targets all five platforms. In a headless CI box with no Xcode /
-> Android SDK you can still run the full test suite (below) and `flutter
-> analyze`; you just can't produce device binaries there.
+> Rune targets all five platforms. On a headless CI box with no Xcode / Android
+> SDK you can still run the full test suite (below) and `flutter analyze`; you
+> just can't produce device binaries there.
 
 ---
 
 ## Testing
 
-The security guarantees are backed by tests. Quick version:
+The security claims aren't vibes — they're tested. The short version:
 
 ```bash
 # Core security + logic tests (no Flutter needed)
@@ -180,45 +208,47 @@ cd packages/notes_core && dart test
 cd app && flutter test
 ```
 
-What's covered (encryption round-trips, wrong-passphrase rejection, CRUD,
-search, export behaviour, no-plaintext-at-rest, no-secret-logging) is described
+What's covered — encryption round-trips, wrong-passphrase rejection, CRUD,
+search, export behaviour, no-plaintext-at-rest, no-secret-logging — is described
 in [TESTING.md](TESTING.md).
 
-These exact checks — `dart analyze` + `dart test` for the core, and `flutter
-analyze` + `flutter test` for the app — run in
-[GitHub Actions](.github/workflows/ci.yml) on every push and pull request, so
-the security tests pass publicly on each commit (see the CI badge above).
+These same checks (`dart analyze` + `dart test` for the core, `flutter analyze` +
+`flutter test` for the app) run in
+[GitHub Actions](.github/workflows/ci.yml) on every push and pull request, so the
+security tests pass publicly on each commit (see the CI badge above).
 
 ---
 
-## What's complete / stubbed / todo
+## What works today, what's next
 
-### Complete and tested
-- First-launch vault creation with passphrase + irreversibility warning.
-- Lock / unlock; app starts locked if a vault exists; manual lock; auto-lock on
-  inactivity; lock-on-background.
-- Optional Face ID / Touch ID / Windows Hello unlock, off by default, caching
-  only the vault DEK behind the platform credential store and prompting
-  automatically after opt-in.
+### Done and tested
+- First-launch vault creation with a passphrase and an irreversibility warning.
+- Lock / unlock; the app starts locked if a vault exists; manual lock; auto-lock
+  on inactivity; lock-on-background.
+- Optional Face ID / Touch ID / Windows Hello unlock, off by default, caching only
+  the vault DEK behind the platform credential store and prompting automatically
+  after opt-in.
 - Argon2id + XChaCha20-Poly1305 envelope encryption; encrypted at rest.
-- Wrong passphrase cannot decrypt (test-proven).
+- A wrong passphrase cannot decrypt (test-proven).
 - Notes: create, edit (autosave), delete, list, local search.
 - Encrypted backup export; plaintext export gated behind explicit confirmation.
-- Settings screen with the privacy posture, auto-lock, change passphrase.
+- Settings screen with the privacy posture, auto-lock, and change-passphrase.
 - Responsive Apple-Notes-style UI (two-pane desktop, single-pane mobile).
-- Voice note flow: record locally → transcribe → insert into a note → **delete
-  raw audio by default**.
+- Voice-note flow: record locally → transcribe on-device → insert into a note →
+  **delete the raw audio by default**.
 
-### Partially complete
-- **Local speech-to-text.** Audio *recording* is real (`record`, 16 kHz mono
-  WAV). On macOS, transcription runs locally through whisper.cpp via Dart FFI
-  with a bundled quantized English model. Android builds and bundles the same
-  whisper.cpp bridge and uses it on device — verified on a Samsung Galaxy A53
-  (Android 15, arm64) transcribing the bundled JFK sample. iOS links the bridge
-  as a force-loaded static library and resolves it with `DynamicLibrary.process()`,
-  verified on a physical iPhone (iOS 26, arm64) transcribing a real recording.
-  Windows and Linux have no bundled engine, so the voice-note UI is disabled
-  there rather than inserting placeholder text; see
+### On-device speech-to-text
+Audio *recording* is real (`record`, 16 kHz mono WAV). Transcription runs locally
+through whisper.cpp via Dart FFI with a bundled quantized English model:
+
+- **macOS** — via the bundled dylib.
+- **Android** — the same whisper.cpp bridge, verified on a Samsung Galaxy A53
+  (Android 15, arm64) transcribing the bundled JFK sample.
+- **iOS** — the bridge linked as a force-loaded static library and resolved with
+  `DynamicLibrary.process()`, verified on a physical iPhone (iOS 26, arm64)
+  transcribing a real recording.
+- **Windows / Linux** — no bundled engine yet, so the voice-note flow is disabled
+  there rather than inserting placeholder text. See
   [docs/transcription.md](docs/transcription.md).
 
 ### Not done yet (see [ROADMAP.md](ROADMAP.md))
@@ -226,7 +256,7 @@ the security tests pass publicly on each commit (see the CI badge above).
   path).
 - Optional native crypto acceleration (`cryptography_flutter`) for faster
   Argon2id on mobile.
-- Metadata-hardening (size padding), encrypted attachments.
+- Metadata hardening (size padding), encrypted attachments.
 
 ---
 
@@ -257,4 +287,5 @@ Copyright © 2026 Rory Standley.
 This is free software: you may redistribute and/or modify it under the terms of
 the GPLv3. It comes with **no warranty**. Contributions are welcome — see
 [CONTRIBUTING.md](CONTRIBUTING.md), which covers how contributions interact with
-app-store distribution. Distribution/packaging notes live in [RELEASE.md](RELEASE.md).
+app-store distribution. Distribution/packaging notes live in
+[RELEASE.md](RELEASE.md).
