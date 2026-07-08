@@ -1,0 +1,9 @@
+Voice transcription reliability + housekeeping.
+
+* Voice notes now show a clear error if the on-device speech engine can't
+  start, instead of silently inserting placeholder text.
+* On platforms without an on-device engine, the voice-note option is disabled
+  rather than producing a placeholder.
+* Settings now shows the correct app version.
+
+Still fully offline: no network, no telemetry, no accounts. Not yet audited.

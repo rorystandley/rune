@@ -41,7 +41,9 @@ class AppController extends ChangeNotifier {
   final Directory audioTempDir;
   final Directory exportsDir;
   final SettingsStore settingsStore;
-  final TranscriptionService transcription;
+  /// On-device transcription engine, or `null` when this platform has no
+  /// bundled engine (voice notes are then disabled rather than stubbed).
+  final TranscriptionService? transcription;
   final AudioRecorderPort recorder;
   final BiometricUnlockStore biometricUnlockStore;
   final KdfParams? createKdfParams;

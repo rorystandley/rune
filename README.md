@@ -2,8 +2,9 @@
 
 [![CI](https://github.com/rorystandley/rune/actions/workflows/ci.yml/badge.svg)](https://github.com/rorystandley/rune/actions/workflows/ci.yml)
 [![Get it on Google Play](https://img.shields.io/badge/Google_Play-Download-E8B520?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=co.rorystandley.rune)
+[![Download on the App Store](https://img.shields.io/badge/App_Store-Download-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/us/app/rune-secure-notes/id6786366361)
 
-> **Now on Google Play:** [co.rorystandley.rune](https://play.google.com/store/apps/details?id=co.rorystandley.rune)
+> **Now on the stores:** [Google Play](https://play.google.com/store/apps/details?id=co.rorystandley.rune) · [App Store](https://apps.apple.com/us/app/rune-secure-notes/id6786366361)
 
 <p align="center"><img src="docs/assets/screenshot-home.png" width="300" alt="Rune — encrypted notes list"></p>
 
@@ -16,8 +17,9 @@ network calls at all**.
 > biometric/OS unlock, notes CRUD, search, auto-lock, backup/export, and the
 > voice-note flow are implemented and tested. On-device speech-to-text is
 > implemented for macOS, Android, and iOS via whisper.cpp (Android and iOS
-> verified on physical devices), with stub fallback still used on Windows and Linux
-> (see [Voice transcription](#voice-transcription)). This is not audited
+> verified on physical devices). Windows and Linux have no on-device engine yet,
+> so the voice-note flow is disabled there rather than inserting placeholder
+> text. This is not audited
 > software — see [SECURITY.md](SECURITY.md) for honest limitations.
 
 ---
@@ -215,8 +217,9 @@ the security tests pass publicly on each commit (see the CI badge above).
   (Android 15, arm64) transcribing the bundled JFK sample. iOS links the bridge
   as a force-loaded static library and resolves it with `DynamicLibrary.process()`,
   verified on a physical iPhone (iOS 26, arm64) transcribing a real recording.
-  Windows and Linux keep
-  `StubTranscriptionService`; see [docs/transcription.md](docs/transcription.md).
+  Windows and Linux have no bundled engine, so the voice-note UI is disabled
+  there rather than inserting placeholder text; see
+  [docs/transcription.md](docs/transcription.md).
 
 ### Not done yet (see [ROADMAP.md](ROADMAP.md))
 - Native file picker / share sheet for exports (currently saved to a documented
