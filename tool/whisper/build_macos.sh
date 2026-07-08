@@ -7,6 +7,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." >/dev/null 2>&1 && pwd -P)
 APP_DIR="$ROOT_DIR/app"
 SOURCE_DIR="${WHISPER_CPP_SOURCE_DIR:-$ROOT_DIR/third_party/whisper.cpp}"
 
+# Xcode.app GUI build phases (Product > Archive / Build) run with a minimal PATH
+# (/usr/bin:/bin:/usr/sbin:/sbin) that omits Homebrew, so a Homebrew-installed
+# cmake/ninja isn't found even though a terminal `flutter build` works. Prepend the
+# common Homebrew bin dirs (Apple Silicon + Intel) so GUI archives resolve them too.
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
 if ! command -v cmake >/dev/null 2>&1; then
   echo "error: cmake is required to build whisper.cpp from source." >&2
   echo "Install cmake, then rebuild the macOS app." >&2

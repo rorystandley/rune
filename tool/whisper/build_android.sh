@@ -10,6 +10,12 @@ APP_DIR="$ROOT_DIR/app"
 ANDROID_DIR="$APP_DIR/android"
 SOURCE_DIR="${WHISPER_CPP_SOURCE_DIR:-$ROOT_DIR/third_party/whisper.cpp}"
 
+# GUI builds (Android Studio) and some Gradle invocations run with a minimal PATH
+# that omits Homebrew, so a Homebrew-installed cmake isn't found even though a
+# terminal `flutter build` works. Prepend the common Homebrew bin dirs (macOS Apple
+# Silicon + Intel); on Linux/CI these dirs don't exist and are simply ignored.
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
 if ! command -v cmake >/dev/null 2>&1; then
   echo "error: cmake is required to build whisper.cpp from source." >&2
   exit 1
