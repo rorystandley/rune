@@ -62,8 +62,8 @@ leaves the phone either.
 
 ## Under the hood
 
-**Flutter with a pure-Dart core.** One codebase covers all five platforms with no
-per-platform UI rewrites — but the decision that matters is the split beneath it:
+**Flutter with a pure-Dart core.** The same code runs on iOS, Android, macOS,
+Windows, and Linux. Underneath, the app is split in two:
 
 - **`packages/notes_core/`** holds *all* the crypto, storage, and note logic in
   **pure Dart**: no Flutter, no network, no logging of secrets. Because it never
@@ -73,15 +73,13 @@ per-platform UI rewrites — but the decision that matters is the split beneath 
 - **`app/`** is a thin Flutter layer on top — screens, state, and platform glue
   (file paths, microphone) and nothing more.
 
-Keeping the security-critical code small and Flutter-free makes it easy to audit,
-light on dependencies, and portable: it could just as well back a CLI or a server
-later without changing.
+The security code stays small and Flutter-free, so it's easy to read and review
+on its own.
 
-**The cryptography** comes from the
-[`cryptography`](https://pub.dev/packages/cryptography) package — a well-known,
-pure-Dart implementation of standard primitives. Rune uses it for **Argon2id**
-(key derivation) and **XChaCha20-Poly1305** (authenticated encryption), and
-implements no cryptographic primitive of its own. Full design and threat model:
+**Cryptography** is the [`cryptography`](https://pub.dev/packages/cryptography)
+package, a pure-Dart implementation of standard primitives: **Argon2id** for key
+derivation and **XChaCha20-Poly1305** for authenticated encryption. Rune writes
+none of its own crypto. Full design and threat model in
 [SECURITY.md](SECURITY.md).
 
 ### Envelope encryption
@@ -198,7 +196,7 @@ flutter build macos         # or: ios, apk, appbundle, linux, windows
 
 ## Testing
 
-The security claims aren't vibes — they're tested. The short version:
+The security properties are covered by tests. Run them yourself:
 
 ```bash
 # Core security + logic tests (no Flutter needed)
