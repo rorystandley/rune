@@ -14,8 +14,10 @@ void main() {
 
   Future<AppController> buildController({
     BiometricUnlockStore? biometricUnlockStore,
+    SettingsStore? settingsStore,
   }) async {
-    final store = SettingsStore(File('${root.path}/settings.json'));
+    final store =
+        settingsStore ?? SettingsStore(File('${root.path}/settings.json'));
     // Disable auto-lock in tests so no Timer is left pending.
     await store.save(const AppSettings(autoLockMinutes: 0));
     final c = AppController(
@@ -252,6 +254,39 @@ void main() {
       throwsA(isA<PlaintextExportNotConfirmedException>()),
     );
   });
+
+  test('updateSettings rolls back and rethrows when the save fails', () async {
+    final store = _ThrowingSettingsStore(File('${root.path}/settings.json'));
+    controller.dispose();
+    controller = await buildController(settingsStore: store);
+    await controller.createVault('passphrase123');
+
+    final before = controller.settings.autoLockMinutes;
+    store.failSaves = true;
+
+    // The write fails, so the change must not stick and the error must surface.
+    await expectLater(
+      controller.updateSettings(
+        controller.settings.copyWith(autoLockMinutes: 30),
+      ),
+      throwsA(isA<Exception>()),
+    );
+    expect(controller.settings.autoLockMinutes, before); // rolled back
+  });
+}
+
+/// A [SettingsStore] whose [save] can be made to fail on demand, to exercise
+/// the rollback path in [AppController.updateSettings].
+class _ThrowingSettingsStore extends SettingsStore {
+  _ThrowingSettingsStore(super.file);
+
+  bool failSaves = false;
+
+  @override
+  Future<void> save(AppSettings settings) async {
+    if (failSaves) throw Exception('simulated settings write failure');
+    return super.save(settings);
+  }
 }
 
 class MemoryBiometricUnlockStore implements BiometricUnlockStore {

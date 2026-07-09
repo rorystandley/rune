@@ -75,10 +75,14 @@ tracking. Effort is a rough T-shirt size for the client-side work.
    stays encrypted the whole time. A safety net matters *more* here because there
    is no cloud to recover from. (Medium.)
 
-3. **Appearance controls.** In-app Light / Dark / System toggle and an adjustable
-   text size (plus editor max-width on wide screens). Today the theme is whatever
-   the OS decides and the font size is fixed; reading/writing comfort is the most
-   common notes-app request. (Small.)
+3. **Appearance controls.** Implemented: a Settings → Appearance section offers an
+   in-app Light / Dark / System theme toggle and an adjustable reading text size
+   (a slider with a live preview), both applied immediately and persisted to
+   `settings.json`. The text-size preference composes with the OS accessibility
+   scale rather than overriding it. The editor now caps its content at a
+   comfortable reading measure and centres it on wide screens instead of
+   stretching edge-to-edge. Reading/writing comfort is the most common
+   notes-app request. (Small.)
 
 4. **Desktop keyboard shortcuts.** ⌘N new note, ⌘F focus search, ⌘⌫ delete, ⌘L
    lock, Esc to clear search. The two-pane layout already signals "desktop"; power

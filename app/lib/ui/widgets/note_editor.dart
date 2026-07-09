@@ -109,49 +109,72 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     ));
   }
 
+  /// Comfortable reading measure for the title/body text; on wide screens the
+  /// content stops stretching edge-to-edge and stays centred within this width.
+  static const double _maxContentWidth = 720;
+
+  /// Base side gutter kept on every screen width, on both sides.
+  static const double _sideGutter = 20;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            key: const Key('editor-title'),
-            controller: _title,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Centre the content by padding the sides once the *content* (i.e.
+        // excluding the two base gutters) would exceed the reading measure.
+        // Padding (not Center/Align) keeps the Column's height tight so its
+        // Expanded body still lays out.
+        final overflow =
+            constraints.maxWidth - _maxContentWidth - 2 * _sideGutter;
+        final sidePad = overflow > 0 ? overflow / 2 : 0.0;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+              _sideGutter + sidePad, 12, _sideGutter + sidePad, 12),
+          child: _buildEditor(theme),
+        );
+      },
+    );
+  }
+
+  Widget _buildEditor(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          key: const Key('editor-title'),
+          controller: _title,
+          onChanged: (_) => _onChanged(),
+          textCapitalization: TextCapitalization.sentences,
+          style: theme.textTheme.titleLarge
+              ?.copyWith(fontWeight: FontWeight.w700),
+          decoration: const InputDecoration(
+            hintText: 'Title',
+            border: InputBorder.none,
+            isCollapsed: true,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: TextField(
+            key: const Key('editor-body'),
+            controller: _body,
             onChanged: (_) => _onChanged(),
+            expands: true,
+            maxLines: null,
+            minLines: null,
+            textAlignVertical: TextAlignVertical.top,
+            keyboardType: TextInputType.multiline,
             textCapitalization: TextCapitalization.sentences,
-            style: theme.textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.w700),
+            style: theme.textTheme.bodyLarge?.copyWith(height: 1.4),
             decoration: const InputDecoration(
-              hintText: 'Title',
+              hintText: 'Start writing…',
               border: InputBorder.none,
               isCollapsed: true,
             ),
           ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: TextField(
-              key: const Key('editor-body'),
-              controller: _body,
-              onChanged: (_) => _onChanged(),
-              expands: true,
-              maxLines: null,
-              minLines: null,
-              textAlignVertical: TextAlignVertical.top,
-              keyboardType: TextInputType.multiline,
-              textCapitalization: TextCapitalization.sentences,
-              style: theme.textTheme.bodyLarge?.copyWith(height: 1.4),
-              decoration: const InputDecoration(
-                hintText: 'Start writing…',
-                border: InputBorder.none,
-                isCollapsed: true,
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

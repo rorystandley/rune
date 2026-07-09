@@ -42,15 +42,39 @@ class _NotesAppState extends State<NotesApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return AppScope(
-      controller: widget.controller,
-      child: MaterialApp(
-        title: 'Rune',
-        debugShowCheckedModeBanner: false,
-        theme: buildTheme(Brightness.light),
-        darkTheme: buildTheme(Brightness.dark),
-        home: const _Root(),
-      ),
+    return AppScope(controller: widget.controller, child: const _App());
+  }
+}
+
+/// Builds the [MaterialApp] from the live [AppSettings] so the in-app
+/// appearance controls (theme mode + reading text size) take effect
+/// immediately. Kept below [AppScope] so a settings change rebuilds it.
+class _App extends StatelessWidget {
+  const _App();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = AppScope.of(context).settings;
+    return MaterialApp(
+      title: 'Rune',
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
+      themeMode: settings.themeMode,
+      builder: (context, child) {
+        // Compose the reading-size preference with the platform's own scaling
+        // so OS accessibility text sizing still contributes rather than being
+        // overridden. `scale(1)` reads back the platform's effective factor.
+        final media = MediaQuery.of(context);
+        final platformFactor = media.textScaler.scale(1);
+        return MediaQuery(
+          data: media.copyWith(
+            textScaler: TextScaler.linear(platformFactor * settings.textScale),
+          ),
+          child: child!,
+        );
+      },
+      home: const _Root(),
     );
   }
 }
