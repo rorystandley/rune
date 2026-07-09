@@ -66,10 +66,14 @@ tracking. Effort is a rough T-shirt size for the client-side work.
    rows show a pin glyph. Pinning preserves the note's modified time. The
    highest-value organizing feature, and calmer than folders or tags. (Small.)
 
-2. **Undo delete + Recently Deleted.** Replace the hard-delete confirm with an
-   "Undo" snackbar backed by soft-delete and a purge window. A safety net matters
-   *more* here because there is no cloud to recover from. (Medium; see the
-   soft-delete follow-up below.)
+2. **Undo delete + Recently Deleted.** Implemented: a `deletedAt` flag soft-deletes
+   notes instead of erasing them. Deleting from the editor now shows an "Undo"
+   snackbar (no confirm dialog) and drops the note into a **Recently Deleted**
+   view — reachable from a footer that appears in the list only when something is
+   there. From there notes can be restored, deleted forever, or emptied; anything
+   left is purged permanently after a 30-day window on the next unlock. The blob
+   stays encrypted the whole time. A safety net matters *more* here because there
+   is no cloud to recover from. (Medium.)
 
 3. **Appearance controls.** In-app Light / Dark / System toggle and an adjustable
    text size (plus editor max-width on wide screens). Today the theme is whatever
@@ -106,7 +110,6 @@ tracking. Effort is a rough T-shirt size for the client-side work.
 
 ## Smaller follow-ups
 
-- Soft-delete / "Recently deleted" with a purge window.
 - Markdown preview toggle (kept optional; the editor stays plain by default).
 - Tags or folders (only if they don't complicate the calm UX).
 - Configurable Argon2id presets (interactive / sensitive) in settings.

@@ -6,6 +6,15 @@ All notable changes to Rune are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Undo delete + Recently Deleted.** Deleting a note now soft-deletes it and
+  shows an "Undo" snackbar instead of a confirm dialog. Deleted notes collect in
+  a Recently Deleted view (reachable from a list footer) where they can be
+  restored, deleted forever, or emptied; anything left is purged permanently
+  after 30 days. Notes stay encrypted the entire time.
+- **Pin to top.** Notes can be pinned to a "Pinned" section above the list from
+  the editor toolbar or a long-press, keeping the most-used notes in reach.
+
 ## [0.3.0] - 2026-06-29
 
 ### Added

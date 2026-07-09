@@ -1,5 +1,9 @@
 import 'dart:convert';
 
+/// Sentinel so [Note.copyWith] can distinguish "leave [deletedAt] as-is" from
+/// "explicitly clear it back to null" (restoring a soft-deleted note).
+const Object _unchanged = Object();
+
 /// A single note.
 ///
 /// This is *plaintext*. It only ever exists in memory while the vault is
@@ -13,6 +17,7 @@ class Note {
     required this.createdAt,
     required this.updatedAt,
     this.pinned = false,
+    this.deletedAt,
   });
 
   /// Opaque random identifier (also the on-disk filename). Reveals nothing
@@ -27,11 +32,22 @@ class Note {
   /// organizing hint; it has no effect on encryption or storage layout.
   final bool pinned;
 
+  /// When set, the note is soft-deleted: it lives in "Recently Deleted" and is
+  /// hidden from the main list until it is either restored (cleared back to
+  /// null) or permanently purged after the retention window. Null for a live
+  /// note. Like [pinned], this is metadata only — the note stays encrypted on
+  /// disk exactly as before.
+  final DateTime? deletedAt;
+
+  /// True while the note sits in Recently Deleted awaiting restore or purge.
+  bool get isDeleted => deletedAt != null;
+
   Note copyWith({
     String? title,
     String? body,
     DateTime? updatedAt,
     bool? pinned,
+    Object? deletedAt = _unchanged,
   }) =>
       Note(
         id: id,
@@ -40,6 +56,9 @@ class Note {
         createdAt: createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
         pinned: pinned ?? this.pinned,
+        deletedAt: identical(deletedAt, _unchanged)
+            ? this.deletedAt
+            : deletedAt as DateTime?,
       );
 
   /// First non-empty line of the body, for list previews.
@@ -69,6 +88,8 @@ class Note {
         'createdAt': createdAt.toUtc().toIso8601String(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
         'pinned': pinned,
+        // Only written when soft-deleted, so live notes keep a clean payload.
+        if (deletedAt != null) 'deletedAt': deletedAt!.toUtc().toIso8601String(),
       };
 
   factory Note.fromJson(Map<String, dynamic> json) => Note(
@@ -78,6 +99,9 @@ class Note {
         createdAt: DateTime.parse(json['createdAt'] as String),
         updatedAt: DateTime.parse(json['updatedAt'] as String),
         pinned: (json['pinned'] as bool?) ?? false,
+        deletedAt: (json['deletedAt'] as String?) != null
+            ? DateTime.parse(json['deletedAt'] as String)
+            : null,
       );
 
   /// UTF-8 JSON bytes — the exact plaintext that gets encrypted.

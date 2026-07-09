@@ -182,6 +182,120 @@ void main() {
     });
   });
 
+  testWidgets('deleting a note shows an Undo snackbar that restores it', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    late Note note;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_undo_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      note = await controller.newNote();
+      await controller.saveNote(note.id, title: 'Delete me', body: 'body');
+    });
+
+    // Wide layout so the editor toolbar (with its delete button) is on screen.
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    // Select the note, then delete it.
+    await tester.tap(find.text('Delete me').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Delete note'));
+    for (var i = 0; i < 40 && controller.deletedNotes.isEmpty; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump();
+    }
+    // Let the snackbar finish sliding in so its action is hit-testable.
+    await tester.pumpAndSettle();
+
+    // Soft-deleted, and the Undo affordance is shown.
+    expect(controller.deletedNotes.length, 1);
+    expect(controller.visibleNotes, isEmpty);
+    expect(find.text('Note deleted'), findsOneWidget);
+    expect(find.text('Undo'), findsOneWidget);
+
+    // Undo brings it back.
+    await tester.tap(find.text('Undo'));
+    for (var i = 0; i < 40 && controller.deletedNotes.isNotEmpty; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    expect(controller.deletedNotes, isEmpty);
+    expect(controller.visibleNotes.single.title, 'Delete me');
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
+  testWidgets('Recently Deleted footer opens the view and restores a note', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_trash_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      final n = await controller.newNote();
+      await controller.saveNote(n.id, title: 'Trashed', body: '');
+      await controller.deleteNote(n.id);
+    });
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    // The footer surfaces because a note is in Recently Deleted.
+    expect(find.byKey(const Key('recently-deleted-entry')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('recently-deleted-entry')));
+    await tester.pumpAndSettle();
+    expect(find.text('Recently Deleted'), findsWidgets);
+    expect(find.text('Trashed'), findsOneWidget);
+
+    // Open the note's actions and restore it.
+    await tester.tap(find.text('Trashed'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Restore'));
+    for (var i = 0; i < 40 && controller.deletedNotes.isNotEmpty; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    expect(controller.deletedNotes, isEmpty);
+    expect(controller.visibleNotes.single.title, 'Trashed');
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
   testWidgets('enabled biometric unlock runs automatically when locked', (
     tester,
   ) async {

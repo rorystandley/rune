@@ -7,11 +7,12 @@ void main() {
   late Directory dir;
   late VaultService vault;
   late NotesRepository repo;
+  late FileVaultStore store;
 
   setUp(() async {
     dir = await Directory.systemTemp.createTemp('notes_repo_test_');
     final crypto = CryptoService();
-    final store = FileVaultStore(dir);
+    store = FileVaultStore(dir);
     vault = VaultService(store: store, crypto: crypto);
     await vault.createVault('pw',
         kdfParams: crypto.newKdfParams(memoryKiB: 256, iterations: 1, parallelism: 1));
@@ -45,11 +46,120 @@ void main() {
     expect(repo.getNote(n.id)!.body, 'two');
   });
 
-  test('delete removes the note and its file', () async {
+  test('delete soft-deletes: hidden from list, still on disk, recoverable',
+      () async {
+    final n = await repo.createNote(body: 'x');
+    final deleted = await repo.deleteNote(n.id);
+
+    expect(deleted, isNotNull);
+    expect(deleted!.isDeleted, isTrue);
+    // Hidden from the live list and getNote, but its blob is untouched.
+    expect(repo.getNote(n.id), isNull);
+    expect(repo.listNotes(), isEmpty);
+    expect(repo.count, 0);
+    expect(await File('${dir.path}/notes/${n.id}.note').exists(), isTrue);
+
+    // Surfaced in Recently Deleted and restorable.
+    expect(repo.listDeleted().single.id, n.id);
+    expect(repo.deletedCount, 1);
+
+    final restored = await repo.restoreNote(n.id);
+    expect(restored!.isDeleted, isFalse);
+    expect(repo.getNote(n.id)!.body, 'x');
+    expect(repo.listDeleted(), isEmpty);
+    expect(repo.count, 1);
+  });
+
+  test('purge permanently removes a soft-deleted note and its file', () async {
     final n = await repo.createNote(body: 'x');
     await repo.deleteNote(n.id);
+    await repo.purgeNote(n.id);
+
     expect(repo.getNote(n.id), isNull);
+    expect(repo.listDeleted(), isEmpty);
     expect(await File('${dir.path}/notes/${n.id}.note').exists(), isFalse);
+  });
+
+  test('purgeAllDeleted empties Recently Deleted but keeps live notes',
+      () async {
+    final keep = await repo.createNote(title: 'keep');
+    final a = await repo.createNote(title: 'a');
+    final b = await repo.createNote(title: 'b');
+    await repo.deleteNote(a.id);
+    await repo.deleteNote(b.id);
+
+    await repo.purgeAllDeleted();
+
+    expect(repo.listDeleted(), isEmpty);
+    expect(repo.listNotes().single.id, keep.id);
+  });
+
+  test('deleting an already-deleted note is a no-op', () async {
+    final n = await repo.createNote(body: 'x');
+    final first = await repo.deleteNote(n.id);
+    final again = await repo.deleteNote(n.id);
+    expect(again, isNull);
+    // The original deletion timestamp is preserved.
+    expect(repo.listDeleted().single.deletedAt, first!.deletedAt);
+  });
+
+  test('restoring a live note is a no-op', () async {
+    final n = await repo.createNote(body: 'x');
+    expect(await repo.restoreNote(n.id), isNull);
+  });
+
+  test('a soft-deleted note cannot be updated or pinned', () async {
+    final n = await repo.createNote(body: 'x');
+    await repo.deleteNote(n.id);
+    expect(() => repo.updateNote(n.id, body: 'y'), throwsStateError);
+    expect(() => repo.setPinned(n.id, true), throwsStateError);
+  });
+
+  test('loadAll purges notes past the retention window, keeps recent ones',
+      () async {
+    final old = await repo.createNote(title: 'old');
+    final recent = await repo.createNote(title: 'recent');
+    await repo.deleteNote(old.id);
+    await repo.deleteNote(recent.id);
+
+    // Backdate the "old" note's deletion beyond the retention window on disk,
+    // writing straight through the vault/store to simulate an aged blob.
+    final overdue = DateTime.now()
+        .toUtc()
+        .subtract(NotesRepository.recentlyDeletedRetention)
+        .subtract(const Duration(days: 1));
+    final aged =
+        repo.listDeleted().firstWhere((n) => n.id == old.id).copyWith(
+              deletedAt: overdue,
+            );
+    await store.writeNoteBlob(
+        aged.id, await vault.sealNote(aged.toEncodedBytes()));
+
+    vault.lock();
+    repo.clear();
+    await vault.unlock('pw');
+    await repo.loadAll();
+
+    expect(repo.getNote(old.id), isNull);
+    expect(repo.listDeleted().any((n) => n.id == old.id), isFalse); // purged
+    expect(await File('${dir.path}/notes/${old.id}.note').exists(), isFalse);
+    expect(repo.listDeleted().single.id, recent.id); // still within window
+  });
+
+  test('soft-delete survives lock + reopen', () async {
+    final n = await repo.createNote(title: 'trash me');
+    await repo.deleteNote(n.id);
+    vault.lock();
+    repo.clear();
+
+    final store2 = FileVaultStore(dir);
+    final vault2 = VaultService(store: store2);
+    await vault2.unlock('pw');
+    final repo2 = NotesRepository(vault: vault2, store: store2);
+    await repo2.loadAll();
+
+    expect(repo2.listNotes(), isEmpty);
+    expect(repo2.listDeleted().single.id, n.id);
   });
 
   test('list is sorted by updatedAt, newest first', () async {
