@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:notes_core/notes_core.dart';
 
+import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 
 /// The search field + scrollable list of notes. Used in both the wide
@@ -63,32 +64,102 @@ class _NoteListState extends State<NoteList> {
           child: notes.isEmpty
               ? _EmptyList(
                   searching: controller.search.isNotEmpty, onNew: widget.onNew)
-              : ListView.separated(
-                  itemCount: notes.length,
-                  separatorBuilder: (_, _) =>
-                      const Divider(indent: 16, endIndent: 16),
-                  itemBuilder: (context, i) {
-                    final note = notes[i];
-                    return _NoteTile(
-                      note: note,
-                      selected: note.id == widget.selectedId,
-                      onTap: () => widget.onOpen(note),
-                    );
-                  },
-                ),
+              : _buildList(controller, notes),
         ),
       ],
+    );
+  }
+
+  Widget _buildList(AppController controller, List<Note> notes) {
+    final pinned = notes.where((n) => n.pinned).toList(growable: false);
+
+    // Sections only make sense when something is pinned and we're not
+    // searching — during search a flat, ranked list is calmer.
+    if (pinned.isEmpty || controller.search.isNotEmpty) {
+      return ListView.separated(
+        itemCount: notes.length,
+        separatorBuilder: (_, _) => const Divider(indent: 16, endIndent: 16),
+        itemBuilder: (context, i) => _noteTile(controller, notes[i]),
+      );
+    }
+
+    final others = notes.where((n) => !n.pinned).toList(growable: false);
+    final entries = <_ListEntry>[
+      const _ListEntry.header('Pinned'),
+      ...pinned.map(_ListEntry.note),
+      if (others.isNotEmpty) const _ListEntry.header('Notes'),
+      ...others.map(_ListEntry.note),
+    ];
+
+    return ListView.builder(
+      itemCount: entries.length,
+      itemBuilder: (context, i) {
+        final entry = entries[i];
+        final header = entry.header;
+        if (header != null) return _SectionHeader(label: header);
+        final tile = _noteTile(controller, entry.note!);
+        // Divider between adjacent note rows, but not before a section header.
+        final next = i + 1 < entries.length ? entries[i + 1] : null;
+        if (next?.note != null) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [tile, const Divider(indent: 16, endIndent: 16)],
+          );
+        }
+        return tile;
+      },
+    );
+  }
+
+  Widget _noteTile(AppController controller, Note note) => _NoteTile(
+        note: note,
+        selected: note.id == widget.selectedId,
+        onTap: () => widget.onOpen(note),
+        onTogglePin: () => controller.togglePinned(note.id),
+      );
+}
+
+/// One row in the sectioned list: either a section [header] or a [note].
+class _ListEntry {
+  const _ListEntry.header(this.header) : note = null;
+  const _ListEntry.note(this.note) : header = null;
+
+  final String? header;
+  final Note? note;
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+      child: Text(
+        label.toUpperCase(),
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.hintColor,
+          letterSpacing: 0.8,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
 
 class _NoteTile extends StatelessWidget {
   const _NoteTile(
-      {required this.note, required this.selected, required this.onTap});
+      {required this.note,
+      required this.selected,
+      required this.onTap,
+      required this.onTogglePin});
 
   final Note note;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback onTogglePin;
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +188,34 @@ class _NoteTile extends StatelessWidget {
           ),
         ],
       ),
+      trailing: note.pinned
+          ? Icon(Icons.push_pin, size: 16, color: theme.hintColor)
+          : null,
       onTap: onTap,
+      onLongPress: () => _showActions(context),
+    );
+  }
+
+  Future<void> _showActions(BuildContext context) async {
+    final pinned = note.pinned;
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(
+                  pinned ? Icons.push_pin_outlined : Icons.push_pin),
+              title: Text(pinned ? 'Unpin' : 'Pin to top'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                onTogglePin();
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

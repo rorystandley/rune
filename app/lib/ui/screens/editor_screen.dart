@@ -31,6 +31,11 @@ class _EditorScreenState extends State<EditorScreen> {
       appBar: AppBar(
         actions: [
           IconButton(
+            icon: Icon(note.pinned ? Icons.push_pin : Icons.push_pin_outlined),
+            tooltip: note.pinned ? 'Unpin' : 'Pin to top',
+            onPressed: () => controller.togglePinned(note.id),
+          ),
+          IconButton(
             icon: const Icon(Icons.mic_none),
             tooltip: 'Voice note',
             onPressed: () =>

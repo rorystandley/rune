@@ -12,6 +12,7 @@ class Note {
     required this.body,
     required this.createdAt,
     required this.updatedAt,
+    this.pinned = false,
   });
 
   /// Opaque random identifier (also the on-disk filename). Reveals nothing
@@ -22,10 +23,15 @@ class Note {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// When true, the note sorts above unpinned notes in the list. Purely an
+  /// organizing hint; it has no effect on encryption or storage layout.
+  final bool pinned;
+
   Note copyWith({
     String? title,
     String? body,
     DateTime? updatedAt,
+    bool? pinned,
   }) =>
       Note(
         id: id,
@@ -33,6 +39,7 @@ class Note {
         body: body ?? this.body,
         createdAt: createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
+        pinned: pinned ?? this.pinned,
       );
 
   /// First non-empty line of the body, for list previews.
@@ -61,6 +68,7 @@ class Note {
         'body': body,
         'createdAt': createdAt.toUtc().toIso8601String(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
+        'pinned': pinned,
       };
 
   factory Note.fromJson(Map<String, dynamic> json) => Note(
@@ -69,6 +77,7 @@ class Note {
         body: (json['body'] as String?) ?? '',
         createdAt: DateTime.parse(json['createdAt'] as String),
         updatedAt: DateTime.parse(json['updatedAt'] as String),
+        pinned: (json['pinned'] as bool?) ?? false,
       );
 
   /// UTF-8 JSON bytes — the exact plaintext that gets encrypted.

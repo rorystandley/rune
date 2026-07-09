@@ -288,6 +288,15 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Toggles the pinned state of a note, moving it into or out of the pinned
+  /// section at the top of the list. No-op if the note no longer exists.
+  Future<void> togglePinned(String id) async {
+    final note = repo.getNote(id);
+    if (note == null) return;
+    await repo.setPinned(id, !note.pinned);
+    notifyListeners();
+  }
+
   void selectNote(String? id) {
     _selectedId = id;
     notifyListeners();

@@ -73,6 +73,27 @@ void main() {
     expect(controller.visibleNotes, isEmpty);
   });
 
+  test('togglePinned moves a note to the top of the visible list', () async {
+    await controller.createVault('passphrase123');
+    final first = await controller.newNote();
+    await controller.saveNote(first.id, title: 'First', body: '');
+    final second = await controller.newNote();
+    await controller.saveNote(second.id, title: 'Second', body: '');
+
+    // Newest-first by default: Second above First.
+    expect(controller.visibleNotes.map((n) => n.id).toList(),
+        [second.id, first.id]);
+
+    await controller.togglePinned(first.id);
+    expect(controller.visibleNotes.first.id, first.id);
+    expect(controller.visibleNotes.first.pinned, isTrue);
+
+    await controller.togglePinned(first.id);
+    expect(controller.visibleNotes.map((n) => n.id).toList(),
+        [second.id, first.id]);
+    expect(controller.visibleNotes.every((n) => !n.pinned), isTrue);
+  });
+
   test('lock, reject wrong passphrase, accept correct one', () async {
     await controller.createVault('passphrase123');
     await controller.newNote();

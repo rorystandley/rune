@@ -138,6 +138,50 @@ void main() {
     });
   });
 
+  testWidgets('pinning a note surfaces a Pinned section at the top', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    late Note pinned;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_pin_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      pinned = await controller.newNote();
+      await controller.saveNote(pinned.id, title: 'Keep me', body: '');
+      final other = await controller.newNote();
+      await controller.saveNote(other.id, title: 'Ordinary', body: '');
+    });
+
+    // Force the wide two-pane layout so the sidebar list is visible.
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    // No section headers until something is pinned.
+    expect(find.text('PINNED'), findsNothing);
+
+    await tester.runAsync(() => controller.togglePinned(pinned.id));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PINNED'), findsOneWidget);
+    expect(find.text('NOTES'), findsOneWidget);
+    expect(controller.visibleNotes.first.id, pinned.id);
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
   testWidgets('enabled biometric unlock runs automatically when locked', (
     tester,
   ) async {
