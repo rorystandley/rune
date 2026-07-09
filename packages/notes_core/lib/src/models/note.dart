@@ -1,8 +1,14 @@
 import 'dart:convert';
 
-/// Sentinel so [Note.copyWith] can distinguish "leave [deletedAt] as-is" from
-/// "explicitly clear it back to null" (restoring a soft-deleted note).
-const Object _unchanged = Object();
+/// Private sentinel so [Note.copyWith] can distinguish "leave [deletedAt] as-is"
+/// from "explicitly clear it back to null" (restoring a soft-deleted note).
+/// The type is library-private, so callers can't construct — and therefore
+/// can't accidentally collide with — this marker.
+class _Unchanged {
+  const _Unchanged();
+}
+
+const _unchanged = _Unchanged();
 
 /// A single note.
 ///
