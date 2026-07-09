@@ -296,6 +296,72 @@ void main() {
     });
   });
 
+  testWidgets('Recently Deleted: Delete forever and Empty purge permanently', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_purge_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      final a = await controller.newNote();
+      await controller.saveNote(a.id, title: 'Alpha', body: '');
+      final b = await controller.newNote();
+      await controller.saveNote(b.id, title: 'Beta', body: '');
+      await controller.deleteNote(a.id);
+      await controller.deleteNote(b.id);
+    });
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    // Open Recently Deleted (both notes are in the bin).
+    await tester.tap(find.byKey(const Key('recently-deleted-entry')));
+    await tester.pumpAndSettle();
+    expect(controller.deletedNotes.length, 2);
+
+    // Delete one forever: tile action -> confirm dialog -> Delete.
+    await tester.tap(find.text('Alpha'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete forever'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete forever?'), findsOneWidget); // confirm shown
+    await tester.tap(find.text('Delete'));
+    for (var i = 0; i < 40 && controller.deletedNotes.length == 2; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    expect(controller.deletedNotes.single.title, 'Beta'); // Alpha gone for good
+
+    // Empty the rest: app-bar action -> confirm dialog -> Delete All.
+    await tester.tap(find.text('Empty'));
+    await tester.pumpAndSettle();
+    expect(find.text('Empty Recently Deleted?'), findsOneWidget);
+    await tester.tap(find.text('Delete All'));
+    for (var i = 0; i < 40 && controller.deletedNotes.isNotEmpty; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    expect(controller.deletedNotes, isEmpty);
+    expect(controller.visibleNotes, isEmpty); // nothing resurrected
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
   testWidgets('enabled biometric unlock runs automatically when locked', (
     tester,
   ) async {
