@@ -90,7 +90,7 @@ void main() {
 
   test('purgeNote refuses to purge a live note', () async {
     final n = await repo.createNote(body: 'x');
-    expect(() => repo.purgeNote(n.id), throwsStateError);
+    await expectLater(repo.purgeNote(n.id), throwsStateError);
     // The note is untouched and still live.
     expect(repo.getNote(n.id), isNotNull);
     expect(await File('${dir.path}/notes/${n.id}.note').exists(), isTrue);
@@ -137,8 +137,8 @@ void main() {
   test('a soft-deleted note cannot be updated or pinned', () async {
     final n = await repo.createNote(body: 'x');
     await repo.deleteNote(n.id);
-    expect(() => repo.updateNote(n.id, body: 'y'), throwsStateError);
-    expect(() => repo.setPinned(n.id, true), throwsStateError);
+    await expectLater(repo.updateNote(n.id, body: 'y'), throwsStateError);
+    await expectLater(repo.setPinned(n.id, true), throwsStateError);
   });
 
   test('loadAll purges notes past the retention window, keeps recent ones',
@@ -230,7 +230,7 @@ void main() {
   });
 
   test('setPinned throws for an unknown note', () async {
-    expect(() => repo.setPinned('nope', true), throwsStateError);
+    await expectLater(repo.setPinned('nope', true), throwsStateError);
   });
 
   test('pinned state persists across lock + reopen', () async {
