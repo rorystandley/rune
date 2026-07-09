@@ -337,12 +337,23 @@ class AppController extends ChangeNotifier {
   // ------------------------------------------------------------- settings ---
 
   Future<void> updateSettings(AppSettings next) async {
+    final previous = _settings;
     _settings = next;
     // Reflect the change (theme, text size, auto-lock…) in the UI immediately,
     // then persist — the disk write must not gate the on-screen response.
     _resetAutoLock();
     notifyListeners();
-    await settingsStore.save(next);
+    try {
+      await settingsStore.save(next);
+    } catch (_) {
+      // The write failed, so on-disk state never changed — roll the in-memory
+      // settings back so the UI can't keep showing a preference that was never
+      // persisted, and let the caller surface the error.
+      _settings = previous;
+      _resetAutoLock();
+      notifyListeners();
+      rethrow;
+    }
   }
 
   Future<void> refreshBiometricUnlockState() => _refreshBiometricUnlockState();

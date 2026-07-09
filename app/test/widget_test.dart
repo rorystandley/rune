@@ -509,23 +509,29 @@ void main() {
       await controller.createVault('passphrase123');
     });
 
+    // Pin a known surface so the slider geometry (and thus the drag) is
+    // deterministic regardless of any view size a prior test left behind.
+    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(NotesApp(controller: controller));
     await tester.pumpAndSettle();
 
-    // The effective text scaler where the UI actually renders (the 'Rune'
-    // title in the sidebar) reflects our app-wide preference.
-    double appTextScale() => MediaQuery.textScalerOf(
-      tester.element(find.text('Rune').first),
-    ).scale(10);
+    // Open Settings and drive the real text-size slider (its onChangeEnd wires
+    // through to updateSettings). Reading the scaler off a Settings element
+    // proves the app-wide MediaQuery composition, since it wraps every route.
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
 
+    double appTextScale() => MediaQuery.textScalerOf(
+      tester.element(find.text('Text size')),
+    ).scale(10);
     final before = appTextScale();
 
-    // Bump the preference up and confirm the app-wide scaler grew with it.
-    await tester.runAsync(
-      () => controller.updateSettings(
-        controller.settings.copyWith(textScale: AppSettings.maxTextScale),
-      ),
-    );
+    // Drag well past the track end; the slider clamps to the maximum preference.
+    await tester.drag(find.byType(Slider), const Offset(2000, 0));
     await tester.pumpAndSettle();
 
     expect(controller.settings.textScale, AppSettings.maxTextScale);
@@ -622,9 +628,9 @@ void main() {
 
     // Narrow: edge-to-edge with only the base 20px gutter.
     expect(await titleInsetAt(400), closeTo(20, 0.5));
-    // Wide: the extra width is split as side padding to cap the measure at 720,
-    // so the content is inset well beyond the base gutter and stays centred.
-    expect(await titleInsetAt(1400), closeTo(20 + (1400 - 720) / 2, 0.5));
+    // Wide: the width beyond the 720 measure + its two 20px gutters is split
+    // into side padding, so the content column is exactly 720 and stays centred.
+    expect(await titleInsetAt(1400), closeTo(20 + (1400 - 720 - 40) / 2, 0.5));
 
     controller.dispose();
     await tester.runAsync(() async {
