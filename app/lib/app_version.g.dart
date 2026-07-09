@@ -13,7 +13,7 @@
 const String kAppVersion = '0.3.1';
 
 /// Build number (the `+N` suffix), or null when the pubspec has none.
-const String? kAppBuildNumber = '4';
+const String? kAppBuildNumber = '5';
 
 /// Human-readable version shown in Settings, e.g. "0.3.0 (build 3)".
-const String kAppVersionDisplay = '0.3.1 (build 4)';
+const String kAppVersionDisplay = '0.3.1 (build 5)';
