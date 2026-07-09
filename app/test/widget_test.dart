@@ -451,6 +451,92 @@ void main() {
     });
   });
 
+  testWidgets('Appearance: theme toggle drives the MaterialApp theme mode', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_theme_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+    });
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    // Follows the OS by default.
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+      ThemeMode.system,
+    );
+
+    // Open Settings and force Dark from the theme segmented control.
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Text size'), findsOneWidget); // Appearance section shown
+    await tester.tap(find.byIcon(Icons.dark_mode_outlined));
+    await tester.pumpAndSettle();
+
+    expect(controller.settings.themeMode, ThemeMode.dark);
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+      ThemeMode.dark,
+    );
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
+  testWidgets('Appearance: text-size slider scales the app text', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_textsize_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+    });
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    // The effective text scaler where the UI actually renders (the 'Rune'
+    // title in the sidebar) reflects our app-wide preference.
+    double appTextScale() => MediaQuery.textScalerOf(
+      tester.element(find.text('Rune').first),
+    ).scale(10);
+
+    final before = appTextScale();
+
+    // Bump the preference up and confirm the app-wide scaler grew with it.
+    await tester.runAsync(
+      () => controller.updateSettings(
+        controller.settings.copyWith(textScale: AppSettings.maxTextScale),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.settings.textScale, AppSettings.maxTextScale);
+    expect(appTextScale(), greaterThan(before));
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
   testWidgets('editor insert handle appends a transcript into the open note', (
     tester,
   ) async {
@@ -491,6 +577,54 @@ void main() {
 
     expect(find.text('first line\ndictated words'), findsOneWidget);
     expect(controller.repo.count, 1); // no extra note was created
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
+  testWidgets('editor centres its content within a reading measure when wide', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    late Note note;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_measure_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      note = await controller.newNote();
+      note = controller.repo.getNote(note.id)!;
+    });
+
+    Future<double> titleInsetAt(double width) async {
+      tester.view.physicalSize = Size(width, 900);
+      tester.view.devicePixelRatio = 1.0;
+      await tester.pumpWidget(
+        AppScope(
+          controller: controller,
+          child: MaterialApp(
+            home: Scaffold(body: NoteEditorView(note: note)),
+          ),
+        ),
+      );
+      await tester.pump();
+      return tester.getTopLeft(find.byKey(const Key('editor-title'))).dx;
+    }
+
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    // Narrow: edge-to-edge with only the base 20px gutter.
+    expect(await titleInsetAt(400), closeTo(20, 0.5));
+    // Wide: the extra width is split as side padding to cap the measure at 720,
+    // so the content is inset well beyond the base gutter and stays centred.
+    expect(await titleInsetAt(1400), closeTo(20 + (1400 - 720) / 2, 0.5));
 
     controller.dispose();
     await tester.runAsync(() async {

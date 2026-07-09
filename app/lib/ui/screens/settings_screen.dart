@@ -4,6 +4,7 @@ import 'package:notes_core/notes_core.dart';
 import '../../app_version.g.dart';
 import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
+import '../../state/app_settings.dart';
 import '../widgets/dialogs.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -21,6 +22,8 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         children: [
           const _PrivacyPostureCard(),
+          _section(context, 'Appearance'),
+          const _AppearanceControls(),
           _section(context, 'Security'),
           ListTile(
             leading: const Icon(Icons.timer_outlined),
@@ -284,6 +287,109 @@ class SettingsScreen extends StatelessWidget {
   void _snack(BuildContext context, String message) => ScaffoldMessenger.of(
     context,
   ).showSnackBar(SnackBar(content: Text(message)));
+}
+
+/// Light / Dark / System theme picker and a reading text-size slider with a
+/// live preview. The slider commits (persists) on release to avoid writing the
+/// settings file on every drag tick.
+class _AppearanceControls extends StatefulWidget {
+  const _AppearanceControls();
+
+  @override
+  State<_AppearanceControls> createState() => _AppearanceControlsState();
+}
+
+class _AppearanceControlsState extends State<_AppearanceControls> {
+  double? _dragScale;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = AppScope.of(context);
+    final settings = controller.settings;
+    final theme = Theme.of(context);
+    final scale = _dragScale ?? settings.textScale;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: Row(
+            children: [
+              const Icon(Icons.brightness_6_outlined),
+              const SizedBox(width: 16),
+              const Expanded(child: Text('Theme')),
+              SegmentedButton<ThemeMode>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(
+                    value: ThemeMode.system,
+                    label: Text('Auto'),
+                    tooltip: 'Follow the system setting',
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.light,
+                    icon: Icon(Icons.light_mode_outlined),
+                    tooltip: 'Light',
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.dark,
+                    icon: Icon(Icons.dark_mode_outlined),
+                    tooltip: 'Dark',
+                  ),
+                ],
+                selected: {settings.themeMode},
+                onSelectionChanged: (s) => controller.updateSettings(
+                  settings.copyWith(themeMode: s.first),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: Row(
+            children: [
+              const Icon(Icons.format_size),
+              const SizedBox(width: 16),
+              const Expanded(child: Text('Text size')),
+              Text(
+                '${(scale * 100).round()}%',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.hintColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Slider(
+          value: scale,
+          min: AppSettings.minTextScale,
+          max: AppSettings.maxTextScale,
+          // 0.05 steps across the ~0.85–1.40 range.
+          divisions:
+              ((AppSettings.maxTextScale - AppSettings.minTextScale) / 0.05)
+                  .round(),
+          label: '${(scale * 100).round()}%',
+          onChanged: (v) => setState(() => _dragScale = v),
+          onChangeEnd: (v) {
+            setState(() => _dragScale = null);
+            controller.updateSettings(settings.copyWith(textScale: v));
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Text(
+            'The quick brown fox jumps over the lazy dog.',
+            // Preview the chosen size directly, independent of the value the
+            // rest of the app is currently rendering at.
+            textScaler: TextScaler.linear(scale),
+            style: theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _PrivacyPostureCard extends StatelessWidget {

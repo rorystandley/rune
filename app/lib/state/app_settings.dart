@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/material.dart' show ThemeMode;
+
 const Object _unchanged = Object();
 
 /// Non-sensitive application preferences.
@@ -15,7 +17,14 @@ class AppSettings {
     this.keepAudioByDefault = false,
     this.biometricUnlockEnabled = false,
     this.biometricUnlockVaultBinding,
+    this.themeMode = ThemeMode.system,
+    this.textScale = 1.0,
   });
+
+  /// Bounds for the in-app reading text size. Kept modest so the layout stays
+  /// intact at either extreme.
+  static const double minTextScale = 0.85;
+  static const double maxTextScale = 1.40;
 
   /// Inactivity timeout before auto-lock. 0 disables the timer.
   final int autoLockMinutes;
@@ -33,12 +42,21 @@ class AppSettings {
   /// Non-secret binding for the vault header the cached DEK belongs to.
   final String? biometricUnlockVaultBinding;
 
+  /// Light / Dark / System app theme. Defaults to following the OS.
+  final ThemeMode themeMode;
+
+  /// Reading text-size multiplier applied app-wide, in
+  /// [minTextScale]..[maxTextScale]. 1.0 is the default size.
+  final double textScale;
+
   AppSettings copyWith({
     int? autoLockMinutes,
     bool? lockOnBackground,
     bool? keepAudioByDefault,
     bool? biometricUnlockEnabled,
     Object? biometricUnlockVaultBinding = _unchanged,
+    ThemeMode? themeMode,
+    double? textScale,
   }) => AppSettings(
     autoLockMinutes: autoLockMinutes ?? this.autoLockMinutes,
     lockOnBackground: lockOnBackground ?? this.lockOnBackground,
@@ -49,6 +67,10 @@ class AppSettings {
         identical(biometricUnlockVaultBinding, _unchanged)
         ? this.biometricUnlockVaultBinding
         : biometricUnlockVaultBinding as String?,
+    themeMode: themeMode ?? this.themeMode,
+    textScale: textScale == null
+        ? this.textScale
+        : textScale.clamp(minTextScale, maxTextScale),
   );
 
   Map<String, dynamic> toJson() => {
@@ -57,6 +79,8 @@ class AppSettings {
     'keepAudioByDefault': keepAudioByDefault,
     'biometricUnlockEnabled': biometricUnlockEnabled,
     'biometricUnlockVaultBinding': biometricUnlockVaultBinding,
+    'themeMode': themeMode.name,
+    'textScale': textScale,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -65,7 +89,19 @@ class AppSettings {
     keepAudioByDefault: (json['keepAudioByDefault'] as bool?) ?? false,
     biometricUnlockEnabled: (json['biometricUnlockEnabled'] as bool?) ?? false,
     biometricUnlockVaultBinding: json['biometricUnlockVaultBinding'] as String?,
+    themeMode: _themeModeFromName(json['themeMode'] as String?),
+    textScale: ((json['textScale'] as num?)?.toDouble() ?? 1.0).clamp(
+      minTextScale,
+      maxTextScale,
+    ),
   );
+
+  static ThemeMode _themeModeFromName(String? name) {
+    for (final mode in ThemeMode.values) {
+      if (mode.name == name) return mode;
+    }
+    return ThemeMode.system;
+  }
 }
 
 /// Reads/writes [AppSettings] to a JSON file. Tolerant of a missing/corrupt

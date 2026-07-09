@@ -338,9 +338,11 @@ class AppController extends ChangeNotifier {
 
   Future<void> updateSettings(AppSettings next) async {
     _settings = next;
-    await settingsStore.save(next);
+    // Reflect the change (theme, text size, auto-lock…) in the UI immediately,
+    // then persist — the disk write must not gate the on-screen response.
     _resetAutoLock();
     notifyListeners();
+    await settingsStore.save(next);
   }
 
   Future<void> refreshBiometricUnlockState() => _refreshBiometricUnlockState();

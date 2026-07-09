@@ -7,6 +7,11 @@ All notable changes to Rune are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Appearance controls.** A new Appearance section in Settings adds an in-app
+  Light / Dark / System theme toggle and an adjustable reading text size (with a
+  live preview), both applied instantly and persisted. Long note lines now stop
+  at a comfortable reading measure and stay centred on wide screens instead of
+  stretching edge-to-edge.
 - **Undo delete + Recently Deleted.** Deleting a note now soft-deletes it and
   shows an "Undo" snackbar instead of a confirm dialog. Deleted notes collect in
   a Recently Deleted view (reachable from a list footer) where they can be
