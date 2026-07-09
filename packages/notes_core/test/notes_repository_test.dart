@@ -70,6 +70,32 @@ void main() {
     expect(repo.count, 1);
   });
 
+  test('listDeleted returns most-recently-deleted first; both recoverable',
+      () async {
+    final a = await repo.createNote(title: 'a');
+    final b = await repo.createNote(title: 'b');
+    await repo.deleteNote(a.id);
+    await Future<void>.delayed(const Duration(milliseconds: 8));
+    await repo.deleteNote(b.id);
+
+    // Newest deletion (b) sorts first, regardless of creation order.
+    expect(repo.listDeleted().map((n) => n.id).toList(), [b.id, a.id]);
+
+    // Both remain recoverable.
+    expect(await repo.restoreNote(a.id), isNotNull);
+    expect(await repo.restoreNote(b.id), isNotNull);
+    expect(repo.listDeleted(), isEmpty);
+    expect(repo.count, 2);
+  });
+
+  test('purgeNote refuses to purge a live note', () async {
+    final n = await repo.createNote(body: 'x');
+    expect(() => repo.purgeNote(n.id), throwsStateError);
+    // The note is untouched and still live.
+    expect(repo.getNote(n.id), isNotNull);
+    expect(await File('${dir.path}/notes/${n.id}.note').exists(), isTrue);
+  });
+
   test('purge permanently removes a soft-deleted note and its file', () async {
     final n = await repo.createNote(body: 'x');
     await repo.deleteNote(n.id);

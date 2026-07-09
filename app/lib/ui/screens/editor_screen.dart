@@ -47,7 +47,7 @@ class _EditorScreenState extends State<EditorScreen> {
             onPressed: () async {
               final navigator = Navigator.of(context);
               await deleteNoteWithUndo(context, widget.noteId);
-              navigator.pop();
+              if (mounted) navigator.pop();
             },
           ),
         ],

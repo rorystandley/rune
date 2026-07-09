@@ -141,6 +141,7 @@ class _DeletedTile extends StatelessWidget {
               title: const Text('Delete forever'),
               onTap: () async {
                 Navigator.of(sheetContext).pop();
+                if (!context.mounted) return;
                 final ok = await confirmDestructive(
                   context,
                   title: 'Delete forever?',
@@ -148,7 +149,7 @@ class _DeletedTile extends StatelessWidget {
                       'This permanently removes the note. This cannot be undone.',
                   confirmLabel: 'Delete',
                 );
-                if (ok) await controller.purgeNote(note.id);
+                if (ok && context.mounted) await controller.purgeNote(note.id);
               },
             ),
           ],

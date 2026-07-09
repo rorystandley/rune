@@ -150,8 +150,14 @@ class NotesRepository {
 
   /// Permanently removes a note and its on-disk blob. Used for "Delete forever"
   /// from Recently Deleted and by [_purgeExpired]; unlike [deleteNote] this is
-  /// irreversible.
+  /// irreversible. Only operates on soft-deleted notes — purging a live note
+  /// would bypass the Recently Deleted safety net, so that throws. Unknown ids
+  /// are a no-op (the blob is already gone).
   Future<void> purgeNote(String id) async {
+    final note = _notes[id];
+    if (note != null && !note.isDeleted) {
+      throw StateError('Cannot purge a live note; delete it first');
+    }
     await store.deleteNoteBlob(id);
     _notes.remove(id);
   }
