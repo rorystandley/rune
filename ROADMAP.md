@@ -53,6 +53,55 @@ honestly private" to "would survive scrutiny on r/privacy".
     property-based crypto tests, a passphrase-strength meter (zxcvbn), and a
     written incident/key-rotation story.
 
+## User-experience additions (in priority order)
+
+The privacy work above is the point of the app; this is the daily-use polish that
+makes people actually *want* to live in it. All ten are chosen to fit the calm,
+low-chrome ethos and to respect the non-goals below — no WYSIWYG, no cloud, no
+tracking. Effort is a rough T-shirt size for the client-side work.
+
+1. **Pin to top.** A `pinned` flag on the note model surfaces a "Pinned" section
+   above the list. The highest-value organizing feature, and calmer than folders
+   or tags. (Small.)
+
+2. **Undo delete + Recently Deleted.** Replace the hard-delete confirm with an
+   "Undo" snackbar backed by soft-delete and a purge window. A safety net matters
+   *more* here because there is no cloud to recover from. (Medium; see the
+   soft-delete follow-up below.)
+
+3. **Appearance controls.** In-app Light / Dark / System toggle and an adjustable
+   text size (plus editor max-width on wide screens). Today the theme is whatever
+   the OS decides and the font size is fixed; reading/writing comfort is the most
+   common notes-app request. (Small.)
+
+4. **Desktop keyboard shortcuts.** ⌘N new note, ⌘F focus search, ⌘⌫ delete, ⌘L
+   lock, Esc to clear search. The two-pane layout already signals "desktop"; power
+   users expect these. (Small.)
+
+5. **Search that shows its work.** Highlight the matched substring in the title /
+   preview and show a result count. Turns search from "did anything happen?" into
+   a real tool. (Small.)
+
+6. **Note info sheet.** Created / modified timestamps, word count, character count,
+   and reading time in a tap-to-open sheet. The editor surfaces none of this today;
+   writers love a word count. (Small.)
+
+7. **Swipe actions in the list.** Swipe a row to pin or delete, with haptics — the
+   standard mobile idiom, currently absent. (Small.)
+
+8. **Markdown preview (read mode).** An optional, off-by-default toggle that renders
+   headings / lists / links and tappable `- [ ]` checkboxes while the editor stays
+   plain text. Keeps WYSIWYG out; checklists alone win a lot of users. (Medium.)
+
+9. **Share & single-note export.** Native share sheet / "copy as text" for one note,
+   plus single-note encrypted export — today it is all-or-nothing from Settings.
+   Pairs with the file-picker / share-sheet work in item 8 above. (Medium.)
+
+10. **Trustworthy first run.** A passphrase-strength meter on vault creation (zxcvbn,
+    from item 10 above) and a warmer first-run empty state that reassures ("encrypted
+    on this device — no account, no cloud") and points at voice notes. For a privacy
+    app, vault creation *is* the trust moment. (Small–Medium.)
+
 ## Smaller follow-ups
 
 - Soft-delete / "Recently deleted" with a purge window.
