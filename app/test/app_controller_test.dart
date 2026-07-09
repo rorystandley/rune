@@ -73,6 +73,56 @@ void main() {
     expect(controller.visibleNotes, isEmpty);
   });
 
+  test('delete is a soft-delete that Undo (restore) reverses', () async {
+    await controller.createVault('passphrase123');
+    final note = await controller.newNote();
+    await controller.saveNote(note.id, title: 'Keep me', body: 'body');
+
+    await controller.deleteNote(note.id);
+    expect(controller.visibleNotes, isEmpty);
+    expect(controller.deletedNotes.single.id, note.id);
+    // Deleting the selected note clears the selection.
+    expect(controller.selectedNote, isNull);
+
+    await controller.restoreNote(note.id);
+    expect(controller.deletedNotes, isEmpty);
+    expect(controller.visibleNotes.single.title, 'Keep me');
+  });
+
+  test('purge permanently removes one note; empty clears the rest', () async {
+    await controller.createVault('passphrase123');
+    final a = await controller.newNote();
+    await controller.saveNote(a.id, title: 'A', body: '');
+    final b = await controller.newNote();
+    await controller.saveNote(b.id, title: 'B', body: '');
+
+    await controller.deleteNote(a.id);
+    await controller.deleteNote(b.id);
+    expect(controller.deletedNotes.length, 2);
+
+    await controller.purgeNote(a.id);
+    expect(controller.deletedNotes.single.id, b.id);
+
+    await controller.emptyRecentlyDeleted();
+    expect(controller.deletedNotes, isEmpty);
+    expect(controller.visibleNotes, isEmpty);
+  });
+
+  test('soft-deleted notes stay out of plaintext export', () async {
+    await controller.createVault('passphrase123');
+    final gone = await controller.newNote();
+    await controller.saveNote(gone.id, title: 'GONE', body: 'trashed');
+    await controller.deleteNote(gone.id);
+
+    final dir = await controller.exportPlaintext(confirmed: true);
+    final names = dir
+        .listSync()
+        .whereType<File>()
+        .map((f) => f.readAsStringSync())
+        .join('\n');
+    expect(names.contains('GONE'), isFalse);
+  });
+
   test('togglePinned moves a note to the top of the visible list', () async {
     await controller.createVault('passphrase123');
     final first = await controller.newNote();

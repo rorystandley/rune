@@ -4,6 +4,7 @@ import 'package:notes_core/notes_core.dart';
 
 import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
+import '../screens/recently_deleted_screen.dart';
 
 /// The search field + scrollable list of notes. Used in both the wide
 /// (sidebar) and narrow (full-screen) layouts. [onOpen] is called when a note
@@ -67,6 +68,10 @@ class _NoteListState extends State<NoteList> {
                   searching: controller.search.isNotEmpty, onNew: widget.onNew)
               : _buildList(controller, notes),
         ),
+        // Recently Deleted lives at the foot of the list — out of the way, and
+        // only when there's something to recover and we're not searching.
+        if (controller.search.isEmpty && controller.deletedNotes.isNotEmpty)
+          _RecentlyDeletedFooter(count: controller.deletedNotes.length),
       ],
     );
   }
@@ -230,6 +235,36 @@ class _NoteTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Entry point to the Recently Deleted view, pinned below the list. Shown only
+/// when at least one note is soft-deleted.
+class _RecentlyDeletedFooter extends StatelessWidget {
+  const _RecentlyDeletedFooter({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Divider(height: 0.5),
+        ListTile(
+          key: const Key('recently-deleted-entry'),
+          leading: Icon(Icons.delete_outline, color: theme.hintColor),
+          title: const Text('Recently Deleted'),
+          trailing: Text('$count', style: theme.textTheme.bodyMedium),
+          dense: true,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const RecentlyDeletedScreen(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

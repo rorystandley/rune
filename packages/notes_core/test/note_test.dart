@@ -51,4 +51,38 @@ void main() {
     // Omitting pinned preserves the existing value.
     expect(pinned.copyWith(title: 'New').pinned, isTrue);
   });
+
+  test('defaults to not deleted, and toJson omits deletedAt when live', () {
+    expect(sample().isDeleted, isFalse);
+    expect(sample().deletedAt, isNull);
+    expect(sample().toJson().containsKey('deletedAt'), isFalse);
+  });
+
+  test('deletedAt survives a JSON round-trip', () {
+    final at = DateTime.utc(2024, 3, 4, 5, 6);
+    final deleted = sample().copyWith(deletedAt: at);
+    final restored = Note.fromJson(deleted.toJson());
+    expect(restored.isDeleted, isTrue);
+    expect(restored.deletedAt, at);
+  });
+
+  test('legacy JSON without a deletedAt field decodes as live', () {
+    final legacy = {
+      'id': 'abc123',
+      'title': 'Title',
+      'body': 'Body',
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'pinned': false,
+    };
+    expect(Note.fromJson(legacy).isDeleted, isFalse);
+  });
+
+  test('copyWith can clear deletedAt (restore) and preserve it otherwise', () {
+    final deleted = sample().copyWith(deletedAt: DateTime.utc(2024, 5, 6));
+    // Clearing back to null restores the note.
+    expect(deleted.copyWith(deletedAt: null).isDeleted, isFalse);
+    // Omitting the arg leaves the deletion in place.
+    expect(deleted.copyWith(title: 'New').isDeleted, isTrue);
+  });
 }

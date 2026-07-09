@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../state/app_scope.dart';
-import '../widgets/dialogs.dart';
+import '../widgets/note_actions.dart';
 import '../widgets/note_editor.dart';
 import '../widgets/note_list.dart';
 import '../widgets/voice_note_sheet.dart';
@@ -221,15 +221,7 @@ class _EditorToolbar extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.delete_outline),
             tooltip: 'Delete note',
-            onPressed: () async {
-              final ok = await confirmDestructive(
-                context,
-                title: 'Delete note?',
-                message: 'This permanently removes the note from your vault.',
-                confirmLabel: 'Delete',
-              );
-              if (ok) await controller.deleteNote(noteId);
-            },
+            onPressed: () => deleteNoteWithUndo(context, noteId),
           ),
         ],
       ),

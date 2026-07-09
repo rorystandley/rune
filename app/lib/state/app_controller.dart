@@ -87,6 +87,13 @@ class AppController extends ChangeNotifier {
   Note? get selectedNote =>
       _selectedId == null ? null : repo.getNote(_selectedId!);
 
+  /// Soft-deleted notes, newest-deleted first — the Recently Deleted view.
+  List<Note> get deletedNotes => repo.listDeleted();
+
+  /// How long a note stays recoverable in Recently Deleted before it is purged.
+  Duration get recentlyDeletedRetention =>
+      NotesRepository.recentlyDeletedRetention;
+
   /// Loads settings and decides the initial phase: locked if a vault exists,
   /// otherwise the create-vault flow.
   Future<void> init() async {
@@ -282,9 +289,29 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Soft-deletes a note into Recently Deleted (reversible via [restoreNote]).
   Future<void> deleteNote(String id) async {
     await repo.deleteNote(id);
     if (_selectedId == id) _selectedId = null;
+    notifyListeners();
+  }
+
+  /// Restores a soft-deleted note back into the main list (the Undo action).
+  Future<void> restoreNote(String id) async {
+    await repo.restoreNote(id);
+    notifyListeners();
+  }
+
+  /// Permanently removes a single soft-deleted note. Irreversible.
+  Future<void> purgeNote(String id) async {
+    await repo.purgeNote(id);
+    if (_selectedId == id) _selectedId = null;
+    notifyListeners();
+  }
+
+  /// Permanently removes every note in Recently Deleted. Irreversible.
+  Future<void> emptyRecentlyDeleted() async {
+    await repo.purgeAllDeleted();
     notifyListeners();
   }
 

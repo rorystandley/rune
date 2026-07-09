@@ -21,6 +21,7 @@ Plain English. No lawyer-speak, no weasel words.
 | Encryption keys | In device RAM only while unlocked | Wiped (best effort) on lock |
 | Auto-lock setting & toggles | `settings.json` on device | Stored in clear — contains no secrets |
 | Voice recordings | Temp folder on device | Deleted after transcription by default |
+| Deleted notes | This device only, up to 30 days | Still encrypted; purged permanently after the window |
 | Exports you create | Where you save them | Encrypted backup = safe; plaintext = **not** safe |
 
 ## Network
@@ -45,6 +46,14 @@ and ships nothing.)
   the network.
 - By default, the **raw audio is deleted** as soon as transcription finishes.
   You can opt to keep it.
+
+## Deleting notes
+
+- Deleting a note moves it to **Recently Deleted** so an accidental delete can be
+  undone. It stays there — **still encrypted, never in the clear** — for 30 days,
+  then is purged permanently on the next unlock.
+- To remove a note immediately, open **Recently Deleted** and choose *Delete
+  forever* (or *Empty* to purge everything at once).
 
 ## Exports
 
