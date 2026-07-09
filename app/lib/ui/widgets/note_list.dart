@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:notes_core/notes_core.dart';
 
 import '../../state/app_controller.dart';
@@ -164,6 +165,19 @@ class _NoteTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Long-press opens the action sheet for pointer users; expose the same
+    // pin/unpin action to assistive tech (which can't reach a long-press) as a
+    // custom semantics action, keeping the row visually uncluttered.
+    return Semantics(
+      customSemanticsActions: {
+        CustomSemanticsAction(label: note.pinned ? 'Unpin' : 'Pin to top'):
+            onTogglePin,
+      },
+      child: _buildTile(theme, context),
+    );
+  }
+
+  Widget _buildTile(ThemeData theme, BuildContext context) {
     return ListTile(
       selected: selected,
       selectedTileColor: theme.colorScheme.primary.withValues(alpha: 0.10),
