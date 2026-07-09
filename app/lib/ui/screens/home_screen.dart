@@ -202,11 +202,17 @@ class _EditorToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
+    final pinned = controller.repo.getNote(noteId)?.pinned ?? false;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         children: [
           const Spacer(),
+          IconButton(
+            icon: Icon(pinned ? Icons.push_pin : Icons.push_pin_outlined),
+            tooltip: pinned ? 'Unpin' : 'Pin to top',
+            onPressed: () => controller.togglePinned(noteId),
+          ),
           IconButton(
             icon: const Icon(Icons.mic_none),
             tooltip: 'Voice note',

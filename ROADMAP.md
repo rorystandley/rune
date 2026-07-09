@@ -60,9 +60,11 @@ makes people actually *want* to live in it. All ten are chosen to fit the calm,
 low-chrome ethos and to respect the non-goals below — no WYSIWYG, no cloud, no
 tracking. Effort is a rough T-shirt size for the client-side work.
 
-1. **Pin to top.** A `pinned` flag on the note model surfaces a "Pinned" section
-   above the list. The highest-value organizing feature, and calmer than folders
-   or tags. (Small.)
+1. **Pin to top.** Implemented: a `pinned` flag on the note model surfaces a
+   "Pinned" section above the list, with the rest under a "Notes" header. Toggle
+   from the editor toolbar (both layouts) or a long-press on any list row; pinned
+   rows show a pin glyph. Pinning preserves the note's modified time. The
+   highest-value organizing feature, and calmer than folders or tags. (Small.)
 
 2. **Undo delete + Recently Deleted.** Replace the hard-delete confirm with an
    "Undo" snackbar backed by soft-delete and a purge window. A safety net matters

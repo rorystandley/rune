@@ -41,10 +41,14 @@ class NotesRepository {
     _loaded = false;
   }
 
-  /// All notes, most-recently-updated first.
+  /// All notes, pinned first, then most-recently-updated first within each
+  /// group. Pinning is metadata only and does not change a note's modified time.
   List<Note> listNotes() {
     final list = _notes.values.toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      ..sort((a, b) {
+        if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+        return b.updatedAt.compareTo(a.updatedAt);
+      });
     return list;
   }
 
@@ -74,6 +78,21 @@ class NotesRepository {
       body: body,
       updatedAt: DateTime.now().toUtc(),
     );
+    await _persist(updated);
+    _notes[id] = updated;
+    return updated;
+  }
+
+  /// Pins or unpins a note. Preserves the note's modified time — pinning is an
+  /// organizing action, not an edit. No-op (returns the existing note) when the
+  /// pin state is already what was requested.
+  Future<Note> setPinned(String id, bool pinned) async {
+    final existing = _notes[id];
+    if (existing == null) {
+      throw StateError('Cannot pin unknown note');
+    }
+    if (existing.pinned == pinned) return existing;
+    final updated = existing.copyWith(pinned: pinned);
     await _persist(updated);
     _notes[id] = updated;
     return updated;
