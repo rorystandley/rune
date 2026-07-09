@@ -11,7 +11,12 @@ import '../screens/recently_deleted_screen.dart';
 /// is tapped; [selectedId] highlights the active note in the sidebar.
 class NoteList extends StatefulWidget {
   const NoteList(
-      {super.key, required this.onOpen, this.selectedId, this.onNew});
+      {super.key,
+      required this.onOpen,
+      this.selectedId,
+      this.onNew,
+      this.searchController,
+      this.searchFocusNode});
 
   final void Function(Note note) onOpen;
   final String? selectedId;
@@ -19,17 +24,25 @@ class NoteList extends StatefulWidget {
   /// Invoked by the empty-state "New note" button (layout decides what happens).
   final VoidCallback? onNew;
 
+  /// Optional externally-owned search controller/focus, so a parent (the wide
+  /// layout) can drive the field via keyboard shortcuts. When null, the list
+  /// owns its own — the plain narrow/mobile case.
+  final TextEditingController? searchController;
+  final FocusNode? searchFocusNode;
+
   @override
   State<NoteList> createState() => _NoteListState();
 }
 
 class _NoteListState extends State<NoteList> {
-  late final TextEditingController _search =
+  late final TextEditingController _search = widget.searchController ??
       TextEditingController(text: AppScope.of(context).search);
 
   @override
   void dispose() {
-    _search.dispose();
+    // Only dispose the controller we created ourselves; a parent-owned one is
+    // the parent's responsibility.
+    if (widget.searchController == null) _search.dispose();
     super.dispose();
   }
 
@@ -46,6 +59,7 @@ class _NoteListState extends State<NoteList> {
           child: TextField(
             key: const Key('search-field'),
             controller: _search,
+            focusNode: widget.searchFocusNode,
             onChanged: controller.setSearch,
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(

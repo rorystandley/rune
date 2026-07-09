@@ -1,7 +1,8 @@
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/app.dart';
 import 'package:notes_app/platform/audio_recorder.dart';
@@ -637,6 +638,132 @@ void main() {
       if (await root.exists()) await root.delete(recursive: true);
     });
   });
+
+  testWidgets('desktop shortcuts: focus search, Esc clears, ⌘L locks', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+
+    late Directory root;
+    late AppController controller;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_shortcut_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      final n = await controller.newNote();
+      await controller.saveNote(n.id, title: 'Findable', body: '');
+    });
+
+    // Wide two-pane layout, where the desktop shortcuts live.
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    final searchField =
+        tester.widget<TextField>(find.byKey(const Key('search-field')));
+    expect(searchField.focusNode!.hasFocus, isFalse);
+
+    // ⌘F focuses the search field.
+    await _sendCmd(tester, LogicalKeyboardKey.keyF);
+    expect(searchField.focusNode!.hasFocus, isTrue);
+
+    // Type a query, then Esc clears it and drops focus.
+    await tester.enterText(find.byKey(const Key('search-field')), 'Findable');
+    await tester.pumpAndSettle();
+    expect(controller.search, 'Findable');
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(controller.search, isEmpty);
+    expect(searchField.controller!.text, isEmpty);
+    expect(searchField.focusNode!.hasFocus, isFalse);
+
+    // ⌘L locks the vault.
+    await _sendCmd(tester, LogicalKeyboardKey.keyL);
+    expect(controller.phase, AppPhase.locked);
+
+    debugDefaultTargetPlatformOverride = null;
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
+  testWidgets('desktop shortcuts: ⌘N creates a note and ⌘⌫ soft-deletes it', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+
+    late Directory root;
+    late AppController controller;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_shortcut_cud_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+    });
+
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+    expect(controller.repo.count, 0);
+
+    // ⌘N creates a note and selects it.
+    await _sendCmd(tester, LogicalKeyboardKey.keyN);
+    for (var i = 0; i < 40 && controller.repo.count == 0; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    expect(controller.repo.count, 1);
+    expect(controller.selectedId, isNotNull);
+
+    // ⌘⌫ soft-deletes the selected note into Recently Deleted.
+    await _sendCmd(tester, LogicalKeyboardKey.backspace);
+    for (var i = 0; i < 40 && controller.deletedNotes.isEmpty; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    expect(controller.deletedNotes.length, 1);
+    expect(controller.visibleNotes, isEmpty);
+    expect(controller.selectedId, isNull);
+    expect(find.text('Note deleted'), findsOneWidget); // Undo snackbar shown
+
+    debugDefaultTargetPlatformOverride = null;
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+}
+
+/// Sends a Cmd+[key] chord (macOS modifier) and settles the frame.
+Future<void> _sendCmd(WidgetTester tester, LogicalKeyboardKey key) async {
+  await tester.sendKeyDownEvent(LogicalKeyboardKey.meta);
+  await tester.sendKeyDownEvent(key);
+  await tester.sendKeyUpEvent(key);
+  await tester.sendKeyUpEvent(LogicalKeyboardKey.meta);
+  await tester.pumpAndSettle();
 }
 
 class WidgetBiometricUnlockStore implements BiometricUnlockStore {
