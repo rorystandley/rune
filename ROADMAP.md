@@ -84,9 +84,14 @@ tracking. Effort is a rough T-shirt size for the client-side work.
    stretching edge-to-edge. Reading/writing comfort is the most common
    notes-app request. (Small.)
 
-4. **Desktop keyboard shortcuts.** ⌘N new note, ⌘F focus search, ⌘⌫ delete, ⌘L
-   lock, Esc to clear search. The two-pane layout already signals "desktop"; power
-   users expect these. (Small.)
+4. **Desktop keyboard shortcuts.** Implemented: the two-pane (wide) layout binds
+   ⌘N new note, ⌘F focus search, ⌘⌫ delete the selected note, ⌘L lock, and Esc to
+   clear search. The modifier follows the platform — Cmd on macOS, Ctrl on
+   Windows/Linux — and the shortcuts stay live wherever focus sits in the layout.
+   The search field also carries a clear (×) button, which is the reliable
+   clear-while-typing affordance on macOS (where AppKit swallows a bare Escape
+   inside a focused text field before Flutter can see it). The two-pane layout
+   already signals "desktop"; power users expect these. (Small.)
 
 5. **Search that shows its work.** Highlight the matched substring in the title /
    preview and show a result count. Turns search from "did anything happen?" into

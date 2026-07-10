@@ -11,7 +11,12 @@ import '../screens/recently_deleted_screen.dart';
 /// is tapped; [selectedId] highlights the active note in the sidebar.
 class NoteList extends StatefulWidget {
   const NoteList(
-      {super.key, required this.onOpen, this.selectedId, this.onNew});
+      {super.key,
+      required this.onOpen,
+      this.selectedId,
+      this.onNew,
+      this.searchController,
+      this.searchFocusNode});
 
   final void Function(Note note) onOpen;
   final String? selectedId;
@@ -19,17 +24,34 @@ class NoteList extends StatefulWidget {
   /// Invoked by the empty-state "New note" button (layout decides what happens).
   final VoidCallback? onNew;
 
+  /// Optional externally-owned search controller/focus, so a parent (the wide
+  /// layout) can drive the field via keyboard shortcuts. When null, the list
+  /// owns its own — the plain narrow/mobile case.
+  final TextEditingController? searchController;
+  final FocusNode? searchFocusNode;
+
   @override
   State<NoteList> createState() => _NoteListState();
 }
 
 class _NoteListState extends State<NoteList> {
-  late final TextEditingController _search =
+  // Captured at construction so dispose can't disagree with how `_search` was
+  // created, even if the widget is later reconfigured with a different one.
+  late final bool _ownsSearch;
+  late final TextEditingController _search = widget.searchController ??
       TextEditingController(text: AppScope.of(context).search);
 
   @override
+  void initState() {
+    super.initState();
+    _ownsSearch = widget.searchController == null;
+  }
+
+  @override
   void dispose() {
-    _search.dispose();
+    // Only dispose the controller we created ourselves; a parent-owned one is
+    // the parent's responsibility.
+    if (_ownsSearch) _search.dispose();
     super.dispose();
   }
 
@@ -46,11 +68,25 @@ class _NoteListState extends State<NoteList> {
           child: TextField(
             key: const Key('search-field'),
             controller: _search,
+            focusNode: widget.searchFocusNode,
             onChanged: controller.setSearch,
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
               hintText: 'Search',
               prefixIcon: const Icon(Icons.search, size: 20),
+              // A clear affordance for pointer users — the Esc shortcut does the
+              // same thing from the keyboard.
+              suffixIcon: controller.search.isEmpty
+                  ? null
+                  : IconButton(
+                      key: const Key('search-clear'),
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        _search.clear();
+                        controller.setSearch('');
+                      },
+                    ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,

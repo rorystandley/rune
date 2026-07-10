@@ -1,7 +1,8 @@
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/app.dart';
 import 'package:notes_app/platform/audio_recorder.dart';
@@ -637,6 +638,336 @@ void main() {
       if (await root.exists()) await root.delete(recursive: true);
     });
   });
+
+  testWidgets('desktop shortcuts: focus search, Esc clears, ⌘L locks', (
+    tester,
+  ) async {
+    // Reset in `finally` rather than `addTearDown`: this global is checked by
+    // the framework's end-of-body invariant assertion, which runs *before*
+    // teardowns — so a leaked override would fail the check. `finally` also
+    // restores it if an `expect` throws early.
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    late Directory root;
+    late AppController controller;
+    try {
+      await tester.runAsync(() async {
+        root = await Directory.systemTemp.createTemp('notes_shortcut_test_');
+        controller = _newController(root);
+        await controller.settingsStore.save(
+          const AppSettings(autoLockMinutes: 0),
+        );
+        await controller.init();
+        await controller.createVault('passphrase123');
+        final n = await controller.newNote();
+        await controller.saveNote(n.id, title: 'Findable', body: '');
+      });
+
+      // Wide two-pane layout, where the desktop shortcuts live.
+      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(NotesApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      final searchField =
+          tester.widget<TextField>(find.byKey(const Key('search-field')));
+      expect(searchField.focusNode!.hasFocus, isFalse);
+
+      // ⌘F focuses the search field.
+      await _sendCmd(tester, LogicalKeyboardKey.keyF);
+      expect(searchField.focusNode!.hasFocus, isTrue);
+
+      // Type a query, then Esc clears it and drops focus.
+      await tester.enterText(find.byKey(const Key('search-field')), 'Findable');
+      await tester.pumpAndSettle();
+      expect(controller.search, 'Findable');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(controller.search, isEmpty);
+      expect(searchField.controller!.text, isEmpty);
+      expect(searchField.focusNode!.hasFocus, isFalse);
+
+      // ⌘L locks the vault.
+      await _sendCmd(tester, LogicalKeyboardKey.keyL);
+      expect(controller.phase, AppPhase.locked);
+
+      controller.dispose();
+      await tester.runAsync(() async {
+        if (await root.exists()) await root.delete(recursive: true);
+      });
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('desktop shortcuts: ⌘N creates a note and ⌘⌫ soft-deletes it', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    late Directory root;
+    late AppController controller;
+    try {
+      await tester.runAsync(() async {
+        root = await Directory.systemTemp.createTemp('notes_shortcut_cud_test_');
+        controller = _newController(root);
+        await controller.settingsStore.save(
+          const AppSettings(autoLockMinutes: 0),
+        );
+        await controller.init();
+        await controller.createVault('passphrase123');
+      });
+
+      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(NotesApp(controller: controller));
+      await tester.pumpAndSettle();
+      expect(controller.repo.count, 0);
+
+      // ⌘N creates a note and selects it.
+      await _sendCmd(tester, LogicalKeyboardKey.keyN);
+      for (var i = 0; i < 40 && controller.repo.count == 0; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)),
+        );
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+      expect(controller.repo.count, 1);
+      expect(controller.selectedId, isNotNull);
+
+      // ⌘⌫ soft-deletes the selected note into Recently Deleted (focus is on
+      // the home node, not a text field, so the delete action is enabled).
+      await _sendCmd(tester, LogicalKeyboardKey.backspace);
+      for (var i = 0; i < 40 && controller.deletedNotes.isEmpty; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)),
+        );
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+      expect(controller.deletedNotes.length, 1);
+      expect(controller.visibleNotes, isEmpty);
+      expect(controller.selectedId, isNull);
+      expect(find.text('Note deleted'), findsOneWidget); // Undo snackbar shown
+
+      controller.dispose();
+      await tester.runAsync(() async {
+        if (await root.exists()) await root.delete(recursive: true);
+      });
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('desktop shortcuts use Ctrl on non-Apple platforms', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    late Directory root;
+    late AppController controller;
+    try {
+      await tester.runAsync(() async {
+        root = await Directory.systemTemp.createTemp('notes_shortcut_ctrl_test_');
+        controller = _newController(root);
+        await controller.settingsStore.save(
+          const AppSettings(autoLockMinutes: 0),
+        );
+        await controller.init();
+        await controller.createVault('passphrase123');
+      });
+
+      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(NotesApp(controller: controller));
+      await tester.pumpAndSettle();
+      expect(controller.repo.count, 0);
+
+      // Ctrl+N is the non-mac binding — it creates and selects a note.
+      await _sendCtrl(tester, LogicalKeyboardKey.keyN);
+      for (var i = 0; i < 40 && controller.repo.count == 0; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)),
+        );
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+      expect(controller.repo.count, 1);
+
+      // Ctrl+F focuses the search field.
+      final searchField =
+          tester.widget<TextField>(find.byKey(const Key('search-field')));
+      expect(searchField.focusNode!.hasFocus, isFalse);
+      await _sendCtrl(tester, LogicalKeyboardKey.keyF);
+      expect(searchField.focusNode!.hasFocus, isTrue);
+
+      controller.dispose();
+      await tester.runAsync(() async {
+        if (await root.exists()) await root.delete(recursive: true);
+      });
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('⌘⌫ does not delete the note while the editor is focused', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    late Directory root;
+    late AppController controller;
+    late Note note;
+    try {
+      await tester.runAsync(() async {
+        root = await Directory.systemTemp.createTemp('notes_shortcut_edit_test_');
+        controller = _newController(root);
+        await controller.settingsStore.save(
+          const AppSettings(autoLockMinutes: 0),
+        );
+        await controller.init();
+        await controller.createVault('passphrase123');
+        note = await controller.newNote();
+        await controller.saveNote(note.id, title: 'Editing', body: 'body');
+      });
+
+      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(NotesApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      // Open the note and put focus into the editor's title field.
+      await tester.tap(find.text('Editing').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('editor-title')));
+      await tester.pumpAndSettle();
+
+      // With a text field focused the delete action stands aside, so ⌘⌫ is the
+      // editor's delete-to-line-start — the note itself must survive.
+      await _sendCmd(tester, LogicalKeyboardKey.backspace);
+      await tester.pumpAndSettle();
+      expect(controller.deletedNotes, isEmpty);
+      expect(controller.visibleNotes.single.id, note.id);
+
+      controller.dispose();
+      await tester.runAsync(() async {
+        if (await root.exists()) await root.delete(recursive: true);
+      });
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('wide search field seeds from the active query', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_search_seed_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      final n = await controller.newNote();
+      await controller.saveNote(n.id, title: 'Findable', body: '');
+    });
+
+    // A query is already active (as it would be after searching in the narrow
+    // layout) before the wide layout builds.
+    controller.setSearch('Findable');
+
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    // The wide sidebar field reflects the query rather than sitting blank over
+    // a filtered list.
+    final searchField =
+        tester.widget<TextField>(find.byKey(const Key('search-field')));
+    expect(searchField.controller!.text, 'Findable');
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
+  testWidgets('search field shows a clear button that empties the query', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_clearbtn_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      final n = await controller.newNote();
+      await controller.saveNote(n.id, title: 'Keep', body: '');
+    });
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    // No clear button until there is a query.
+    expect(find.byKey(const Key('search-clear')), findsNothing);
+
+    await tester.enterText(find.byKey(const Key('search-field')), 'zzz');
+    await tester.pumpAndSettle();
+    expect(controller.search, 'zzz');
+    expect(find.byKey(const Key('search-clear')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('search-clear')));
+    await tester.pumpAndSettle();
+    expect(controller.search, isEmpty);
+    expect(find.byKey(const Key('search-clear')), findsNothing);
+    expect(controller.visibleNotes.single.title, 'Keep');
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+}
+
+/// Sends a Cmd+[key] chord (macOS modifier) and settles the frame.
+Future<void> _sendCmd(WidgetTester tester, LogicalKeyboardKey key) =>
+    _sendChord(tester, LogicalKeyboardKey.meta, key);
+
+/// Sends a Ctrl+[key] chord (Windows/Linux modifier) and settles the frame.
+Future<void> _sendCtrl(WidgetTester tester, LogicalKeyboardKey key) =>
+    _sendChord(tester, LogicalKeyboardKey.control, key);
+
+Future<void> _sendChord(
+  WidgetTester tester,
+  LogicalKeyboardKey modifier,
+  LogicalKeyboardKey key,
+) async {
+  await tester.sendKeyDownEvent(modifier);
+  await tester.sendKeyDownEvent(key);
+  await tester.sendKeyUpEvent(key);
+  await tester.sendKeyUpEvent(modifier);
+  await tester.pumpAndSettle();
 }
 
 class WidgetBiometricUnlockStore implements BiometricUnlockStore {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../state/app_scope.dart';
 import '../widgets/note_actions.dart';
@@ -82,59 +83,207 @@ class _WideHome extends StatefulWidget {
 
 class _WideHomeState extends State<_WideHome> {
   final EditorInsertHandle _insertHandle = EditorInsertHandle();
+  // The wide layout owns the search field's controller and focus so keyboard
+  // shortcuts (⌘F to focus, Esc to clear) can drive it from outside the list.
+  // Seeded from the live query (lazily, at first build) so a narrow→wide layout
+  // switch mid-search shows the term instead of a blank field over a filtered
+  // list.
+  late final TextEditingController _searchController =
+      TextEditingController(text: AppScope.of(context).search);
+  final FocusNode _searchFocus = FocusNode(debugLabel: 'search');
+  // A resting focus target inside the shortcuts subtree. Parking focus here
+  // (rather than a bare unfocus) keeps the desktop shortcuts live after the
+  // search field blurs — an unfocus would let focus escape above them.
+  final FocusNode _homeFocus = FocusNode(debugLabel: 'home');
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    _homeFocus.dispose();
+    super.dispose();
+  }
+
+  void _focusSearch() {
+    _searchFocus.requestFocus();
+    // Select any existing query so the next keystroke replaces it.
+    _searchController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _searchController.text.length,
+    );
+  }
+
+  void _clearSearch() {
+    // Programmatic edits don't fire the field's onChanged, so tell the
+    // controller directly to keep the visible list in sync.
+    if (_searchController.text.isNotEmpty) {
+      _searchController.clear();
+      AppScope.of(context).setSearch('');
+    }
+    // Only move focus off the search field if it actually had it — Esc is bound
+    // globally, so blindly grabbing focus here would yank it out of the note
+    // editor (e.g. Esc pressed mid-typing on Windows/Linux).
+    if (_searchFocus.hasFocus) _homeFocus.requestFocus();
+  }
+
+  void _deleteSelected() {
+    final id = AppScope.of(context).selectedId;
+    if (id != null) deleteNoteWithUndo(context, id);
+  }
 
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     final selected = controller.selectedNote;
 
-    return Scaffold(
-      body: Row(
-        children: [
-          SizedBox(
-            width: 320,
-            child: Column(
-              children: [
-                const _SidebarHeader(),
-                const Divider(height: 0.5),
-                Expanded(
-                  child: NoteList(
-                    selectedId: controller.selectedId,
-                    onOpen: (note) => controller.selectNote(note.id),
-                    onNew: () => controller.newNote(),
+    return _HomeShortcuts(
+      focusNode: _homeFocus,
+      onNewNote: () => controller.newNote(),
+      onFocusSearch: _focusSearch,
+      onClearSearch: _clearSearch,
+      onDeleteSelected: _deleteSelected,
+      onLock: controller.lock,
+      child: Scaffold(
+        body: Row(
+          children: [
+            SizedBox(
+              width: 320,
+              child: Column(
+                children: [
+                  const _SidebarHeader(),
+                  const Divider(height: 0.5),
+                  Expanded(
+                    child: NoteList(
+                      selectedId: controller.selectedId,
+                      searchController: _searchController,
+                      searchFocusNode: _searchFocus,
+                      onOpen: (note) => controller.selectNote(note.id),
+                      onNew: () => controller.newNote(),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const VerticalDivider(width: 0.5),
-          Expanded(
-            child: selected == null
-                ? const _EmptyEditor()
-                : Column(
-                    children: [
-                      _EditorToolbar(
-                        noteId: selected.id,
-                        onVoice: () => showVoiceNoteSheet(
-                          context,
-                          onTranscribed: _insertHandle.insert,
+            const VerticalDivider(width: 0.5),
+            Expanded(
+              child: selected == null
+                  ? const _EmptyEditor()
+                  : Column(
+                      children: [
+                        _EditorToolbar(
+                          noteId: selected.id,
+                          onVoice: () => showVoiceNoteSheet(
+                            context,
+                            onTranscribed: _insertHandle.insert,
+                          ),
                         ),
-                      ),
-                      const Divider(height: 0.5),
-                      Expanded(
-                        child: NoteEditorView(
-                          key: ValueKey(selected.id),
-                          note: selected,
-                          insertHandle: _insertHandle,
+                        const Divider(height: 0.5),
+                        Expanded(
+                          child: NoteEditorView(
+                            key: ValueKey(selected.id),
+                            note: selected,
+                            insertHandle: _insertHandle,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-          ),
-        ],
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+/// Desktop keyboard shortcuts for the two-pane layout. Bound at the top of the
+/// wide home so they fire wherever focus sits within it: ⌘N new note, ⌘F focus
+/// search, ⌘L lock, ⌘⌫ delete the selected note, and Esc to clear search. The
+/// modifier follows the platform — Cmd on macOS, Ctrl elsewhere.
+///
+/// Note on Esc: while a text field is the focused first responder, macOS turns
+/// a bare Escape into the `cancelOperation:` command and consumes it below the
+/// framework, so this binding can't fire from inside the search field there
+/// (it still works elsewhere, and everywhere on Windows/Linux). The search
+/// field's own clear (×) button is the reliable clear-while-typing affordance.
+class _HomeShortcuts extends StatelessWidget {
+  const _HomeShortcuts({
+    required this.focusNode,
+    required this.onNewNote,
+    required this.onFocusSearch,
+    required this.onClearSearch,
+    required this.onDeleteSelected,
+    required this.onLock,
+    required this.child,
+  });
+
+  final FocusNode focusNode;
+  final VoidCallback onNewNote;
+  final VoidCallback onFocusSearch;
+  final VoidCallback onClearSearch;
+  final VoidCallback onDeleteSelected;
+  final VoidCallback onLock;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final isMac = Theme.of(context).platform == TargetPlatform.macOS;
+    SingleActivator cmd(LogicalKeyboardKey key) =>
+        SingleActivator(key, meta: isMac, control: !isMac);
+    return CallbackShortcuts(
+      bindings: {
+        cmd(LogicalKeyboardKey.keyN): onNewNote,
+        cmd(LogicalKeyboardKey.keyF): onFocusSearch,
+        cmd(LogicalKeyboardKey.keyL): onLock,
+        const SingleActivator(LogicalKeyboardKey.escape): onClearSearch,
+      },
+      // Delete goes through Actions rather than CallbackShortcuts (which would
+      // always consume the key). The action disables itself while a text field
+      // is focused, so the event falls through to the default text-editing
+      // shortcuts and ⌘⌫ still means delete-to-line-start inside the editor —
+      // rather than nuking the whole note.
+      child: Shortcuts(
+        shortcuts: {
+          // ⌘⌫ on a Mac keyboard; also accept the forward Delete key, the usual
+          // delete key on Windows/Linux.
+          cmd(LogicalKeyboardKey.backspace): const _DeleteSelectedIntent(),
+          cmd(LogicalKeyboardKey.delete): const _DeleteSelectedIntent(),
+        },
+        child: Actions(
+          actions: {
+            _DeleteSelectedIntent: _DeleteSelectedAction(onDeleteSelected),
+          },
+          // A default focus target so the shortcuts are live before the user
+          // interacts with any specific pane.
+          child: Focus(focusNode: focusNode, autofocus: true, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+/// Deletes the selected note — but only when no text field is focused, so it
+/// never steals ⌘⌫ from the note editor or search box.
+class _DeleteSelectedIntent extends Intent {
+  const _DeleteSelectedIntent();
+}
+
+class _DeleteSelectedAction extends Action<_DeleteSelectedIntent> {
+  _DeleteSelectedAction(this.onDelete);
+
+  final VoidCallback onDelete;
+
+  @override
+  bool get isActionEnabled => !_editableTextHasFocus();
+
+  @override
+  void invoke(_DeleteSelectedIntent intent) => onDelete();
+}
+
+/// Whether primary focus currently sits inside an [EditableText] (a text field).
+bool _editableTextHasFocus() {
+  final context = FocusManager.instance.primaryFocus?.context;
+  return context != null &&
+      context.findAncestorStateOfType<EditableTextState>() != null;
 }
 
 class _SidebarHeader extends StatelessWidget {

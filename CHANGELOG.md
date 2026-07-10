@@ -7,6 +7,10 @@ All notable changes to Rune are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Desktop keyboard shortcuts.** The two-pane layout now responds to ⌘N (new
+  note), ⌘F (focus search), ⌘⌫ (delete the selected note), ⌘L (lock), and Esc
+  (clear search) — using Ctrl instead of Cmd on Windows and Linux. The search
+  field also gained a clear (×) button.
 - **Appearance controls.** A new Appearance section in Settings adds an in-app
   Light / Dark / System theme toggle and an adjustable reading text size (with a
   live preview), both applied instantly and persisted. Long note lines now stop
