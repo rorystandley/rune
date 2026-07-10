@@ -868,6 +868,47 @@ void main() {
     }
   });
 
+  testWidgets('wide search field seeds from the active query', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_search_seed_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      final n = await controller.newNote();
+      await controller.saveNote(n.id, title: 'Findable', body: '');
+    });
+
+    // A query is already active (as it would be after searching in the narrow
+    // layout) before the wide layout builds.
+    controller.setSearch('Findable');
+
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    // The wide sidebar field reflects the query rather than sitting blank over
+    // a filtered list.
+    final searchField =
+        tester.widget<TextField>(find.byKey(const Key('search-field')));
+    expect(searchField.controller!.text, 'Findable');
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
   testWidgets('search field shows a clear button that empties the query', (
     tester,
   ) async {

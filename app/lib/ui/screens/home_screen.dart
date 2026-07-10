@@ -85,7 +85,11 @@ class _WideHomeState extends State<_WideHome> {
   final EditorInsertHandle _insertHandle = EditorInsertHandle();
   // The wide layout owns the search field's controller and focus so keyboard
   // shortcuts (⌘F to focus, Esc to clear) can drive it from outside the list.
-  final TextEditingController _searchController = TextEditingController();
+  // Seeded from the live query (lazily, at first build) so a narrow→wide layout
+  // switch mid-search shows the term instead of a blank field over a filtered
+  // list.
+  late final TextEditingController _searchController =
+      TextEditingController(text: AppScope.of(context).search);
   final FocusNode _searchFocus = FocusNode(debugLabel: 'search');
   // A resting focus target inside the shortcuts subtree. Parking focus here
   // (rather than a bare unfocus) keeps the desktop shortcuts live after the
