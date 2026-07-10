@@ -35,14 +35,23 @@ class NoteList extends StatefulWidget {
 }
 
 class _NoteListState extends State<NoteList> {
+  // Captured at construction so dispose can't disagree with how `_search` was
+  // created, even if the widget is later reconfigured with a different one.
+  late final bool _ownsSearch;
   late final TextEditingController _search = widget.searchController ??
       TextEditingController(text: AppScope.of(context).search);
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsSearch = widget.searchController == null;
+  }
 
   @override
   void dispose() {
     // Only dispose the controller we created ourselves; a parent-owned one is
     // the parent's responsibility.
-    if (widget.searchController == null) _search.dispose();
+    if (_ownsSearch) _search.dispose();
     super.dispose();
   }
 
