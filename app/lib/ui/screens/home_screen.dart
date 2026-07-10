@@ -116,8 +116,10 @@ class _WideHomeState extends State<_WideHome> {
       _searchController.clear();
       AppScope.of(context).setSearch('');
     }
-    // Blur the field but keep focus within the shortcuts subtree.
-    _homeFocus.requestFocus();
+    // Only move focus off the search field if it actually had it — Esc is bound
+    // globally, so blindly grabbing focus here would yank it out of the note
+    // editor (e.g. Esc pressed mid-typing on Windows/Linux).
+    if (_searchFocus.hasFocus) _homeFocus.requestFocus();
   }
 
   void _deleteSelected() {
@@ -228,17 +230,56 @@ class _HomeShortcuts extends StatelessWidget {
         cmd(LogicalKeyboardKey.keyN): onNewNote,
         cmd(LogicalKeyboardKey.keyF): onFocusSearch,
         cmd(LogicalKeyboardKey.keyL): onLock,
-        // ⌘⌫ on a Mac keyboard; also accept the forward Delete key, which is the
-        // usual delete key on Windows/Linux.
-        cmd(LogicalKeyboardKey.backspace): onDeleteSelected,
-        cmd(LogicalKeyboardKey.delete): onDeleteSelected,
         const SingleActivator(LogicalKeyboardKey.escape): onClearSearch,
       },
-      // A default focus target so the shortcuts are live before the user
-      // interacts with any specific pane.
-      child: Focus(focusNode: focusNode, autofocus: true, child: child),
+      // Delete goes through Actions rather than CallbackShortcuts (which would
+      // always consume the key). The action disables itself while a text field
+      // is focused, so the event falls through to the default text-editing
+      // shortcuts and ⌘⌫ still means delete-to-line-start inside the editor —
+      // rather than nuking the whole note.
+      child: Shortcuts(
+        shortcuts: {
+          // ⌘⌫ on a Mac keyboard; also accept the forward Delete key, the usual
+          // delete key on Windows/Linux.
+          cmd(LogicalKeyboardKey.backspace): const _DeleteSelectedIntent(),
+          cmd(LogicalKeyboardKey.delete): const _DeleteSelectedIntent(),
+        },
+        child: Actions(
+          actions: {
+            _DeleteSelectedIntent: _DeleteSelectedAction(onDeleteSelected),
+          },
+          // A default focus target so the shortcuts are live before the user
+          // interacts with any specific pane.
+          child: Focus(focusNode: focusNode, autofocus: true, child: child),
+        ),
+      ),
     );
   }
+}
+
+/// Deletes the selected note — but only when no text field is focused, so it
+/// never steals ⌘⌫ from the note editor or search box.
+class _DeleteSelectedIntent extends Intent {
+  const _DeleteSelectedIntent();
+}
+
+class _DeleteSelectedAction extends Action<_DeleteSelectedIntent> {
+  _DeleteSelectedAction(this.onDelete);
+
+  final VoidCallback onDelete;
+
+  @override
+  bool get isActionEnabled => !_editableTextHasFocus();
+
+  @override
+  void invoke(_DeleteSelectedIntent intent) => onDelete();
+}
+
+/// Whether primary focus currently sits inside an [EditableText] (a text field).
+bool _editableTextHasFocus() {
+  final context = FocusManager.instance.primaryFocus?.context;
+  return context != null &&
+      context.findAncestorStateOfType<EditableTextState>() != null;
 }
 
 class _SidebarHeader extends StatelessWidget {
