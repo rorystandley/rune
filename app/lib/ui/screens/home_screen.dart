@@ -193,6 +193,12 @@ class _WideHomeState extends State<_WideHome> {
 /// wide home so they fire wherever focus sits within it: ⌘N new note, ⌘F focus
 /// search, ⌘L lock, ⌘⌫ delete the selected note, and Esc to clear search. The
 /// modifier follows the platform — Cmd on macOS, Ctrl elsewhere.
+///
+/// Note on Esc: while a text field is the focused first responder, macOS turns
+/// a bare Escape into the `cancelOperation:` command and consumes it below the
+/// framework, so this binding can't fire from inside the search field there
+/// (it still works elsewhere, and everywhere on Windows/Linux). The search
+/// field's own clear (×) button is the reliable clear-while-typing affordance.
 class _HomeShortcuts extends StatelessWidget {
   const _HomeShortcuts({
     required this.focusNode,
@@ -222,7 +228,10 @@ class _HomeShortcuts extends StatelessWidget {
         cmd(LogicalKeyboardKey.keyN): onNewNote,
         cmd(LogicalKeyboardKey.keyF): onFocusSearch,
         cmd(LogicalKeyboardKey.keyL): onLock,
+        // ⌘⌫ on a Mac keyboard; also accept the forward Delete key, which is the
+        // usual delete key on Windows/Linux.
         cmd(LogicalKeyboardKey.backspace): onDeleteSelected,
+        cmd(LogicalKeyboardKey.delete): onDeleteSelected,
         const SingleActivator(LogicalKeyboardKey.escape): onClearSearch,
       },
       // A default focus target so the shortcuts are live before the user

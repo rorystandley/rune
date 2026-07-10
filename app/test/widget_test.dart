@@ -755,6 +755,46 @@ void main() {
       if (await root.exists()) await root.delete(recursive: true);
     });
   });
+
+  testWidgets('search field shows a clear button that empties the query', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_clearbtn_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      final n = await controller.newNote();
+      await controller.saveNote(n.id, title: 'Keep', body: '');
+    });
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    // No clear button until there is a query.
+    expect(find.byKey(const Key('search-clear')), findsNothing);
+
+    await tester.enterText(find.byKey(const Key('search-field')), 'zzz');
+    await tester.pumpAndSettle();
+    expect(controller.search, 'zzz');
+    expect(find.byKey(const Key('search-clear')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('search-clear')));
+    await tester.pumpAndSettle();
+    expect(controller.search, isEmpty);
+    expect(find.byKey(const Key('search-clear')), findsNothing);
+    expect(controller.visibleNotes.single.title, 'Keep');
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
 }
 
 /// Sends a Cmd+[key] chord (macOS modifier) and settles the frame.

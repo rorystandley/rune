@@ -65,6 +65,19 @@ class _NoteListState extends State<NoteList> {
             decoration: InputDecoration(
               hintText: 'Search',
               prefixIcon: const Icon(Icons.search, size: 20),
+              // A clear affordance for pointer users — the Esc shortcut does the
+              // same thing from the keyboard.
+              suffixIcon: controller.search.isEmpty
+                  ? null
+                  : IconButton(
+                      key: const Key('search-clear'),
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        _search.clear();
+                        controller.setSearch('');
+                      },
+                    ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
