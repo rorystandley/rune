@@ -4,7 +4,10 @@ All notable changes to Rune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.4.0] - 2026-07-11
+
+The whole user-experience section of the roadmap, finished: daily-use polish on
+top of the same privacy posture — still no network, no telemetry, no accounts.
 
 ### Added
 - **Trustworthy first run.** Creating a vault (and changing the passphrase)

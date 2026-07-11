@@ -1,0 +1,10 @@
+Daily-use polish, same privacy posture.
+
+* Search shows a result count and highlights matches.
+* Note info sheet: word count, characters, reading time, dates.
+* Swipe a note to pin or delete (with Undo).
+* Optional Markdown preview with tappable checklists.
+* Share a note as text or export an encrypted copy.
+* Passphrase-strength meter and a warmer first run.
+
+Still fully offline: no network, no telemetry, no accounts. Not yet audited.
