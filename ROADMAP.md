@@ -101,9 +101,10 @@ tracking. Effort is a rough T-shirt size for the client-side work.
    of the matching line so the hit is actually visible. Turns search from "did
    anything happen?" into a real tool. (Small.)
 
-6. **Note info sheet.** Created / modified timestamps, word count, character count,
-   and reading time in a tap-to-open sheet. The editor surfaces none of this today;
-   writers love a word count. (Small.)
+6. **Note info sheet.** Implemented: an info button in the editor (both layouts)
+   opens a sheet with created / modified timestamps, word count, character
+   count, and reading time. Counts follow the live editor text rather than
+   trailing the debounced autosave. Writers love a word count. (Small.)
 
 7. **Swipe actions in the list.** Swipe a row to pin or delete, with haptics — the
    standard mobile idiom, currently absent. (Small.)

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../state/app_scope.dart';
 import '../widgets/note_actions.dart';
 import '../widgets/note_editor.dart';
+import '../widgets/note_info_sheet.dart';
 import '../widgets/note_list.dart';
 import '../widgets/voice_note_sheet.dart';
 import 'editor_screen.dart';
@@ -177,6 +178,11 @@ class _WideHomeState extends State<_WideHome> {
                             context,
                             onTranscribed: _insertHandle.insert,
                           ),
+                          onInfo: () => showNoteInfoSheet(
+                            context,
+                            note: selected,
+                            live: _insertHandle.readCurrent(),
+                          ),
                         ),
                         const Divider(height: 0.5),
                         Expanded(
@@ -346,9 +352,11 @@ class _SidebarHeader extends StatelessWidget {
 }
 
 class _EditorToolbar extends StatelessWidget {
-  const _EditorToolbar({required this.noteId, required this.onVoice});
+  const _EditorToolbar(
+      {required this.noteId, required this.onVoice, required this.onInfo});
   final String noteId;
   final VoidCallback onVoice;
+  final VoidCallback onInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -359,6 +367,12 @@ class _EditorToolbar extends StatelessWidget {
       child: Row(
         children: [
           const Spacer(),
+          IconButton(
+            key: const Key('note-info-button'),
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'Note info',
+            onPressed: onInfo,
+          ),
           IconButton(
             icon: Icon(pinned ? Icons.push_pin : Icons.push_pin_outlined),
             tooltip: pinned ? 'Unpin' : 'Pin to top',
