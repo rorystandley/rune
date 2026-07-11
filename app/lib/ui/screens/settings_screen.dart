@@ -6,6 +6,7 @@ import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 import '../../state/app_settings.dart';
 import '../widgets/dialogs.dart';
+import '../widgets/passphrase_strength_meter.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -526,8 +527,10 @@ class _ChangePassphraseDialogState extends State<_ChangePassphraseDialog> {
           TextField(
             controller: _next,
             obscureText: true,
+            onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(labelText: 'New passphrase'),
           ),
+          PassphraseStrengthMeter(passphrase: _next.text),
           const SizedBox(height: 8),
           TextField(
             controller: _confirm,

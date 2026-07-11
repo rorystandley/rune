@@ -7,6 +7,10 @@ All notable changes to Rune are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Trustworthy first run.** Creating a vault (and changing the passphrase)
+  now shows a live zxcvbn strength meter with targeted feedback — advisory
+  only, it never blocks. The first-run empty state leads with the privacy
+  reassurance and points at starting with a note or a voice note.
 - **Share & single-note export.** A share button in the editor offers the
   native share sheet, "copy as text", and an encrypted export of just that
   note — in the same format as a full backup, so it restores the same way and

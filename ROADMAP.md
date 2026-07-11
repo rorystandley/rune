@@ -50,8 +50,8 @@ honestly private" to "would survive scrutiny on r/privacy".
 
 10. **Hardening polish for distribution:** dependency pinning + SBOM, supply-chain
     review of `record`/`path_provider`, fuzzing the vault/backup parsers,
-    property-based crypto tests, a passphrase-strength meter (zxcvbn), and a
-    written incident/key-rotation story.
+    property-based crypto tests, a passphrase-strength meter (zxcvbn — shipped
+    with UX item 10 below), and a written incident/key-rotation story.
 
 ## User-experience additions (in priority order)
 
@@ -128,10 +128,13 @@ tracking. Effort is a rough T-shirt size for the client-side work.
    Choosing the destination via a native file picker remains with item 8
    above. (Medium.)
 
-10. **Trustworthy first run.** A passphrase-strength meter on vault creation (zxcvbn,
-    from item 10 above) and a warmer first-run empty state that reassures ("encrypted
-    on this device — no account, no cloud") and points at voice notes. For a privacy
-    app, vault creation *is* the trust moment. (Small–Medium.)
+10. **Trustworthy first run.** Implemented: vault creation (and the
+    change-passphrase dialog) shows a live zxcvbn strength meter — advisory
+    only, it never blocks — with zxcvbn's targeted feedback for weak choices.
+    The first-run empty state now leads with the reassurance ("everything you
+    write stays on this device, encrypted — no account, no cloud") and points
+    at both ways to start: a new note or a voice note. For a privacy app,
+    vault creation *is* the trust moment. (Small–Medium.)
 
 ## Smaller follow-ups
 
