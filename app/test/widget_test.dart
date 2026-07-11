@@ -923,6 +923,9 @@ void main() {
       final searchField =
           tester.widget<TextField>(find.byKey(const Key('search-field')));
       expect(searchField.controller!.text, isEmpty);
+      // Equivalent to the key-event path: the wide layout's onSearchDismiss
+      // re-parks focus off the field.
+      expect(searchField.focusNode!.hasFocus, isFalse);
 
       controller.dispose();
       await tester.runAsync(() async {
