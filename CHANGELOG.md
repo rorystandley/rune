@@ -7,6 +7,10 @@ All notable changes to Rune are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Share & single-note export.** A share button in the editor offers the
+  native share sheet, "copy as text", and an encrypted export of just that
+  note — in the same format as a full backup, so it restores the same way and
+  never contains plaintext.
 - **Markdown preview (read mode).** An optional, off-by-default toggle in the
   editor renders headings, lists, links (tap to copy), and tappable `- [ ]`
   checkboxes that save back into the note. The editor itself stays plain text.

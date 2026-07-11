@@ -66,4 +66,34 @@ void main() {
     expect(text.contains(secretBody), isTrue);
     expect(text.contains('# $secretTitle'), isTrue);
   });
+
+  test('single-note export carries only that note, still no plaintext',
+      () async {
+    final target = await repo.createNote(title: 'Wanted', body: 'want-this');
+    await repo.createNote(title: 'Other', body: 'not-this');
+
+    final out = File('${dir.path}/one.notesbak');
+    await exporter.exportEncryptedNote(out, target.id);
+    final contents = await out.readAsString();
+
+    // Same self-contained format as a full backup — header and all — but with
+    // exactly one entry, and never any plaintext.
+    final json = jsonDecode(contents) as Map<String, dynamic>;
+    expect(json['format'], ExportService.backupFormat);
+    expect((json['notes'] as Map<String, dynamic>).keys.toList(), [target.id]);
+    expect((json['vault'] as Map<String, dynamic>)['cipher'],
+        'xchacha20poly1305');
+    expect(contents.contains('Wanted'), isFalse);
+    expect(contents.contains('want-this'), isFalse);
+  });
+
+  test('single-note export of an unknown id throws and writes nothing',
+      () async {
+    final out = File('${dir.path}/missing.notesbak');
+    await expectLater(
+      exporter.exportEncryptedNote(out, 'no-such-id'),
+      throwsArgumentError,
+    );
+    expect(await out.exists(), isFalse);
+  });
 }

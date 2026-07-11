@@ -1313,6 +1313,76 @@ void main() {
     });
   });
 
+  testWidgets('share sheet copies text and exports an encrypted single note', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    late Note note;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_share_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      note = await controller.newNote();
+      await controller.saveNote(note.id, title: 'Sharable', body: 'hello');
+    });
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+    controller.selectNote(note.id);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('note-share-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Share as text'), findsOneWidget);
+    expect(find.text('Copy as text'), findsOneWidget);
+    expect(find.text('Export encrypted copy'), findsOneWidget);
+
+    // Copy: closes the sheet and confirms.
+    await tester.tap(find.byKey(const Key('copy-as-text')));
+    await tester.pumpAndSettle();
+    expect(find.text('Note copied'), findsOneWidget);
+
+    // Encrypted single-note export lands in the exports dir with no plaintext.
+    await tester.tap(find.byKey(const Key('note-share-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('export-encrypted-note')));
+    for (var i = 0;
+        i < 40 && find.text('Encrypted note saved').evaluate().isEmpty;
+        i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    expect(find.text('Encrypted note saved'), findsOneWidget);
+
+    await tester.runAsync(() async {
+      final exports = Directory('${root.path}/exports')
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.notesbak'))
+          .toList();
+      expect(exports.length, 1);
+      final contents = await exports.single.readAsString();
+      expect(contents.contains('Sharable'), isFalse);
+      expect(contents.contains('hello'), isFalse);
+    });
+
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
   test('parseMarkdown classifies note lines', () {
     final lines = parseMarkdown(
       '## Head\n- [ ] todo\n- [X] done\n* star\n2) second\n\nplain',

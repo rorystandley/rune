@@ -365,6 +365,13 @@ class AppController extends ChangeNotifier {
     return exporter.exportEncryptedBackup(target);
   }
 
+  /// Encrypted export of a single note, in the same format as a full backup
+  /// (so it restores the same way and needs the same passphrase).
+  Future<File> exportEncryptedNote(String id) async {
+    final target = File('${exportsDir.path}/note-${_stamp()}.notesbak');
+    return exporter.exportEncryptedNote(target, id);
+  }
+
   Future<Directory> exportPlaintext({required bool confirmed}) async {
     final target = Directory('${exportsDir.path}/notes-plaintext-${_stamp()}');
     return exporter.exportPlaintext(target, repo, confirmed: confirmed);
