@@ -88,10 +88,12 @@ tracking. Effort is a rough T-shirt size for the client-side work.
    ⌘N new note, ⌘F focus search, ⌘⌫ delete the selected note, ⌘L lock, and Esc to
    clear search. The modifier follows the platform — Cmd on macOS, Ctrl on
    Windows/Linux — and the shortcuts stay live wherever focus sits in the layout.
-   The search field also carries a clear (×) button, which is the reliable
-   clear-while-typing affordance on macOS (where AppKit swallows a bare Escape
-   inside a focused text field before Flutter can see it). The two-pane layout
-   already signals "desktop"; power users expect these. (Small.)
+   Esc clears search even while typing on every platform: on macOS a focused
+   text field receives a bare Escape as a `DismissIntent` (the `cancelOperation:`
+   selector) rather than a key event, so that case is handled next to the search
+   field; elsewhere it comes through the key-event path. The field also carries a
+   clear (×) button for pointer users. The two-pane layout already signals
+   "desktop"; power users expect these. (Small.)
 
 5. **Search that shows its work.** Highlight the matched substring in the title /
    preview and show a result count. Turns search from "did anything happen?" into

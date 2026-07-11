@@ -16,7 +16,8 @@ class NoteList extends StatefulWidget {
       this.selectedId,
       this.onNew,
       this.searchController,
-      this.searchFocusNode});
+      this.searchFocusNode,
+      this.onSearchDismiss});
 
   final void Function(Note note) onOpen;
   final String? selectedId;
@@ -29,6 +30,12 @@ class NoteList extends StatefulWidget {
   /// owns its own — the plain narrow/mobile case.
   final TextEditingController? searchController;
   final FocusNode? searchFocusNode;
+
+  /// Called when the search field receives a [DismissIntent] — how macOS
+  /// delivers a bare Escape while a text field is focused. Lets the wide layout
+  /// run its full clear (which also re-parks focus for the shortcuts); when
+  /// null the list just clears the query itself.
+  final VoidCallback? onSearchDismiss;
 
   @override
   State<NoteList> createState() => _NoteListState();
@@ -55,6 +62,12 @@ class _NoteListState extends State<NoteList> {
     super.dispose();
   }
 
+  void _clearSearch() {
+    if (_search.text.isEmpty) return;
+    _search.clear();
+    AppScope.of(context).setSearch('');
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
@@ -65,7 +78,19 @@ class _NoteListState extends State<NoteList> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          child: TextField(
+          // Handle Escape-while-typing here, as a direct ancestor of the field:
+          // on macOS a bare Escape arrives as a DismissIntent (cancelOperation:)
+          // rather than a key event, and DismissIntent is re-dispatched up only
+          // to the nearest handler. The wide layout passes its own clear (which
+          // also re-parks focus); otherwise the list clears the query itself.
+          child: Actions(
+            actions: <Type, Action<Intent>>{
+              DismissIntent: CallbackAction<DismissIntent>(
+                onInvoke: (_) =>
+                    (widget.onSearchDismiss ?? _clearSearch).call(),
+              ),
+            },
+            child: TextField(
             key: const Key('search-field'),
             controller: _search,
             focusNode: widget.searchFocusNode,
@@ -82,10 +107,7 @@ class _NoteListState extends State<NoteList> {
                       key: const Key('search-clear'),
                       icon: const Icon(Icons.close, size: 18),
                       tooltip: 'Clear search',
-                      onPressed: () {
-                        _search.clear();
-                        controller.setSearch('');
-                      },
+                      onPressed: _clearSearch,
                     ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
@@ -95,6 +117,7 @@ class _NoteListState extends State<NoteList> {
               fillColor: theme.colorScheme.surfaceContainerHighest
                   .withValues(alpha: 0.5),
               contentPadding: const EdgeInsets.symmetric(vertical: 0),
+            ),
             ),
           ),
         ),
