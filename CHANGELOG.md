@@ -7,6 +7,9 @@ All notable changes to Rune are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Markdown preview (read mode).** An optional, off-by-default toggle in the
+  editor renders headings, lists, links (tap to copy), and tappable `- [ ]`
+  checkboxes that save back into the note. The editor itself stays plain text.
 - **Swipe actions in the list.** Swipe a note row from the leading edge to
   pin/unpin it, or towards the trailing edge to delete it into Recently
   Deleted (with the usual Undo), each with a haptic tick.

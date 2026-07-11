@@ -97,6 +97,11 @@ class _WideHomeState extends State<_WideHome> {
   // search field blurs — an unfocus would let focus escape above them.
   final FocusNode _homeFocus = FocusNode(debugLabel: 'home');
 
+  // Optional Markdown read mode for the open note. Off by default and reset
+  // whenever the selection changes — each note opens in the plain editor.
+  bool _readMode = false;
+  String? _readModeNoteId;
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -136,6 +141,10 @@ class _WideHomeState extends State<_WideHome> {
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     final selected = controller.selectedNote;
+    if (selected?.id != _readModeNoteId) {
+      _readModeNoteId = selected?.id;
+      _readMode = false;
+    }
 
     return _HomeShortcuts(
       focusNode: _homeFocus,
@@ -174,6 +183,7 @@ class _WideHomeState extends State<_WideHome> {
                       children: [
                         _EditorToolbar(
                           noteId: selected.id,
+                          readMode: _readMode,
                           onVoice: () => showVoiceNoteSheet(
                             context,
                             onTranscribed: _insertHandle.insert,
@@ -183,6 +193,8 @@ class _WideHomeState extends State<_WideHome> {
                             note: selected,
                             live: _insertHandle.readCurrent(),
                           ),
+                          onTogglePreview: () =>
+                              setState(() => _readMode = !_readMode),
                         ),
                         const Divider(height: 0.5),
                         Expanded(
@@ -190,6 +202,7 @@ class _WideHomeState extends State<_WideHome> {
                             key: ValueKey(selected.id),
                             note: selected,
                             insertHandle: _insertHandle,
+                            readMode: _readMode,
                           ),
                         ),
                       ],
@@ -353,10 +366,16 @@ class _SidebarHeader extends StatelessWidget {
 
 class _EditorToolbar extends StatelessWidget {
   const _EditorToolbar(
-      {required this.noteId, required this.onVoice, required this.onInfo});
+      {required this.noteId,
+      required this.readMode,
+      required this.onVoice,
+      required this.onInfo,
+      required this.onTogglePreview});
   final String noteId;
+  final bool readMode;
   final VoidCallback onVoice;
   final VoidCallback onInfo;
+  final VoidCallback onTogglePreview;
 
   @override
   Widget build(BuildContext context) {
@@ -367,6 +386,12 @@ class _EditorToolbar extends StatelessWidget {
       child: Row(
         children: [
           const Spacer(),
+          IconButton(
+            key: const Key('preview-toggle'),
+            icon: Icon(readMode ? Icons.edit_outlined : Icons.visibility_outlined),
+            tooltip: readMode ? 'Edit' : 'Preview',
+            onPressed: onTogglePreview,
+          ),
           IconButton(
             key: const Key('note-info-button'),
             icon: const Icon(Icons.info_outline),

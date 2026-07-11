@@ -19,6 +19,9 @@ class EditorScreen extends StatefulWidget {
 class _EditorScreenState extends State<EditorScreen> {
   final EditorInsertHandle _insertHandle = EditorInsertHandle();
 
+  // Optional Markdown read mode; off by default, per editor session.
+  bool _readMode = false;
+
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
@@ -31,6 +34,13 @@ class _EditorScreenState extends State<EditorScreen> {
     return Scaffold(
       appBar: AppBar(
         actions: [
+          IconButton(
+            key: const Key('preview-toggle'),
+            icon: Icon(
+                _readMode ? Icons.edit_outlined : Icons.visibility_outlined),
+            tooltip: _readMode ? 'Edit' : 'Preview',
+            onPressed: () => setState(() => _readMode = !_readMode),
+          ),
           IconButton(
             key: const Key('note-info-button'),
             icon: const Icon(Icons.info_outline),
@@ -67,6 +77,7 @@ class _EditorScreenState extends State<EditorScreen> {
         key: ValueKey(note.id),
         note: note,
         insertHandle: _insertHandle,
+        readMode: _readMode,
       ),
     );
   }
