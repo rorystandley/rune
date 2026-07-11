@@ -26,6 +26,9 @@ dependencies:
   # Native share sheet for user-initiated single-note sharing. No network of
   # its own — it only hands text to the OS share UI.
   share_plus: ^13.2.0
+  # Passphrase-strength estimation (zxcvbn) for the vault-creation meter.
+  # Pure Dart, fully offline; advisory only — it never gates creation.
+  zxcvbnm: ^1.1.1
 
 dev_dependencies:
   flutter_test:

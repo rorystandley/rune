@@ -14,6 +14,7 @@ import 'package:notes_app/ui/widgets/markdown_preview.dart';
 import 'package:notes_app/ui/widgets/note_editor.dart';
 import 'package:notes_app/ui/widgets/note_info_sheet.dart';
 import 'package:notes_app/ui/widgets/note_list.dart';
+import 'package:notes_app/ui/widgets/passphrase_strength_meter.dart';
 import 'package:notes_core/notes_core.dart';
 
 // NOTE: anything that touches the filesystem (createTemp, settings load,
@@ -1376,6 +1377,88 @@ void main() {
 
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
+  testWidgets('vault creation shows a live passphrase-strength meter', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_strength_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+    });
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pump();
+    expect(find.text('Create your vault'), findsOneWidget);
+
+    // Nothing rendered while the field is empty.
+    expect(find.byKey(const Key('strength-label')), findsNothing);
+
+    // A frequently-used password rates at the bottom, with targeted feedback.
+    await tester.enterText(find.byKey(const Key('create-pass')), 'password');
+    await tester.pump();
+    expect(
+      tester.widget<Text>(find.byKey(const Key('strength-label'))).data,
+      estimatePassphrase('password').label,
+    );
+    expect(estimatePassphrase('password').score, 0);
+
+    // A long multi-word passphrase rates at the top.
+    const strong = 'lilac-otter-forges-quiet-anthems-42';
+    await tester.enterText(find.byKey(const Key('create-pass')), strong);
+    await tester.pump();
+    expect(estimatePassphrase(strong).score, 4);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('strength-label'))).data,
+      'Strong',
+    );
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
+  testWidgets('first-run empty state reassures and points at voice notes', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_emptystate_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+    });
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No notes yet'), findsOneWidget);
+    expect(
+      find.textContaining('encrypted — no account, no cloud'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('empty-new-note-button')), findsOneWidget);
+    // The controller has a transcription engine (stub), so the voice pointer
+    // shows and opens the voice-note sheet.
+    await tester.tap(find.byKey(const Key('empty-voice-note-button')));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
 
     controller.dispose();
     await tester.runAsync(() async {

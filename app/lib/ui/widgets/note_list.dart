@@ -7,6 +7,7 @@ import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 import '../screens/recently_deleted_screen.dart';
 import 'note_actions.dart';
+import 'voice_note_sheet.dart';
 
 /// The search field + scrollable list of notes. Used in both the wide
 /// (sidebar) and narrow (full-screen) layouts. [onOpen] is called when a note
@@ -435,28 +436,62 @@ class _EmptyList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (searching) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'No matching notes',
+            textAlign: TextAlign.center,
+            style:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+          ),
+        ),
+      );
+    }
+    // First-run state: for a privacy app this is a trust moment, so lead with
+    // the reassurance and point at both ways to start.
+    final voiceAvailable = AppScope.of(context).transcription != null;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              searching ? 'No matching notes' : 'No notes yet',
-              textAlign: TextAlign.center,
-              style:
-                  theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-            ),
-            if (!searching && onNew != null) ...[
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                key: const Key('empty-new-note-button'),
-                onPressed: onNew,
-                icon: const Icon(Icons.add),
-                label: const Text('New note'),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.lock_outline,
+                  size: 32, color: theme.colorScheme.primary),
+              const SizedBox(height: 12),
+              Text('No notes yet', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Text(
+                'Everything you write stays on this device, encrypted — '
+                'no account, no cloud.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: theme.hintColor),
               ),
+              if (onNew != null) ...[
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  key: const Key('empty-new-note-button'),
+                  onPressed: onNew,
+                  icon: const Icon(Icons.add),
+                  label: const Text('New note'),
+                ),
+              ],
+              if (voiceAvailable) ...[
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  key: const Key('empty-voice-note-button'),
+                  onPressed: () => showVoiceNoteSheet(context),
+                  icon: const Icon(Icons.mic_none),
+                  label: const Text('Or start with a voice note'),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

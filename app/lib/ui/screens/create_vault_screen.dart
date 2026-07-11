@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../state/app_scope.dart';
+import '../widgets/passphrase_strength_meter.dart';
 
 /// First-launch screen: set a passphrase and create the encrypted local vault.
 /// Makes the irreversibility of a forgotten passphrase impossible to miss.
@@ -80,6 +81,7 @@ class _CreateVaultScreenState extends State<CreateVaultScreen> {
                   controller: _pass,
                   obscureText: _obscure,
                   autofocus: true,
+                  onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     labelText: 'Passphrase',
                     suffixIcon: IconButton(
@@ -89,6 +91,9 @@ class _CreateVaultScreenState extends State<CreateVaultScreen> {
                     ),
                   ),
                 ),
+                // Advisory only — it guides towards a stronger passphrase but
+                // never blocks creation.
+                PassphraseStrengthMeter(passphrase: _pass.text),
                 const SizedBox(height: 12),
                 TextField(
                   key: const Key('create-confirm'),
