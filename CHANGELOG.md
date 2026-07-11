@@ -7,6 +7,9 @@ All notable changes to Rune are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Swipe actions in the list.** Swipe a note row from the leading edge to
+  pin/unpin it, or towards the trailing edge to delete it into Recently
+  Deleted (with the usual Undo), each with a haptic tick.
 - **Note info sheet.** An info button in the editor opens a sheet showing the
   note's created and modified times, word count, character count, and reading
   time — computed from the text currently on screen.
