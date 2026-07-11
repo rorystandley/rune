@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:notes_core/notes_core.dart';
 
 import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 import '../screens/recently_deleted_screen.dart';
+import 'note_actions.dart';
 
 /// The search field + scrollable list of notes. Used in both the wide
 /// (sidebar) and narrow (full-screen) layouts. [onOpen] is called when a note
@@ -198,6 +200,7 @@ class _NoteListState extends State<NoteList> {
         selected: note.id == widget.selectedId,
         onTap: () => widget.onOpen(note),
         onTogglePin: () => controller.togglePinned(note.id),
+        onDelete: () => deleteNoteWithUndo(context, note.id),
       );
 }
 
@@ -237,7 +240,8 @@ class _NoteTile extends StatelessWidget {
       required this.query,
       required this.selected,
       required this.onTap,
-      required this.onTogglePin});
+      required this.onTogglePin,
+      required this.onDelete});
 
   final Note note;
 
@@ -247,19 +251,52 @@ class _NoteTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onTogglePin;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     // Long-press opens the action sheet for pointer users; expose the same
-    // pin/unpin action to assistive tech (which can't reach a long-press) as a
-    // custom semantics action, keeping the row visually uncluttered.
+    // pin/unpin and delete actions to assistive tech (which can't reach a
+    // long-press or a swipe) as custom semantics actions, keeping the row
+    // visually uncluttered.
     return Semantics(
       customSemanticsActions: {
         CustomSemanticsAction(label: note.pinned ? 'Unpin' : 'Pin to top'):
             onTogglePin,
+        const CustomSemanticsAction(label: 'Delete'): onDelete,
       },
-      child: _buildTile(theme, context),
+      // The standard mobile idiom: swipe towards the trailing edge to delete
+      // (the row dismisses into Recently Deleted with the usual Undo
+      // snackbar), swipe from the leading edge to pin/unpin (the row springs
+      // back). Both give a haptic tick at the point of no return.
+      child: Dismissible(
+        key: ValueKey('note-swipe-${note.id}'),
+        background: _SwipeBackground(
+          alignment: Alignment.centerLeft,
+          color: theme.colorScheme.primaryContainer,
+          icon: note.pinned ? Icons.push_pin_outlined : Icons.push_pin,
+          iconColor: theme.colorScheme.onPrimaryContainer,
+        ),
+        secondaryBackground: _SwipeBackground(
+          alignment: Alignment.centerRight,
+          color: theme.colorScheme.errorContainer,
+          icon: Icons.delete_outline,
+          iconColor: theme.colorScheme.onErrorContainer,
+        ),
+        confirmDismiss: (direction) async {
+          if (direction == DismissDirection.startToEnd) {
+            // Pin in place: act, but keep the row (it springs back).
+            HapticFeedback.selectionClick();
+            onTogglePin();
+            return false;
+          }
+          HapticFeedback.mediumImpact();
+          return true;
+        },
+        onDismissed: (_) => onDelete(),
+        child: _buildTile(theme, context),
+      ),
     );
   }
 
@@ -331,6 +368,31 @@ class _NoteTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The colour + icon revealed behind a row mid-swipe.
+class _SwipeBackground extends StatelessWidget {
+  const _SwipeBackground({
+    required this.alignment,
+    required this.color,
+    required this.icon,
+    required this.iconColor,
+  });
+
+  final Alignment alignment;
+  final Color color;
+  final IconData icon;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: color,
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Icon(icon, color: iconColor),
     );
   }
 }

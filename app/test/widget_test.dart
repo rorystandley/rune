@@ -1161,6 +1161,87 @@ void main() {
     });
   });
 
+  testWidgets('swipe right pins a note; swipe left deletes with undo', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    late Note note;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_swipe_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      note = await controller.newNote();
+      await controller.saveNote(note.id, title: 'Swipeable', body: 'body');
+    });
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    final row = find.byKey(ValueKey('note-swipe-${note.id}'));
+    expect(row, findsOneWidget);
+
+    // Swipe from the leading edge: the note pins and the row stays.
+    await tester.drag(row, const Offset(300, 0));
+    for (var i = 0;
+        i < 40 && !(controller.repo.getNote(note.id)?.pinned ?? false);
+        i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pumpAndSettle();
+    expect(controller.repo.getNote(note.id)!.pinned, isTrue);
+    expect(find.text('PINNED'), findsOneWidget);
+    expect(row, findsOneWidget);
+
+    // Same swipe again: unpins.
+    await tester.drag(row, const Offset(300, 0));
+    for (var i = 0;
+        i < 40 && (controller.repo.getNote(note.id)?.pinned ?? true);
+        i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pumpAndSettle();
+    expect(controller.repo.getNote(note.id)!.pinned, isFalse);
+
+    // Swipe towards the trailing edge: the row dismisses into Recently
+    // Deleted and the usual Undo snackbar restores it.
+    await tester.drag(row, const Offset(-300, 0));
+    for (var i = 0; i < 40 && controller.deletedNotes.isEmpty; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pumpAndSettle();
+    expect(controller.visibleNotes, isEmpty);
+    expect(find.text('Note deleted'), findsOneWidget);
+
+    await tester.tap(find.text('Undo'));
+    for (var i = 0; i < 40 && controller.deletedNotes.isNotEmpty; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    expect(controller.visibleNotes.single.title, 'Swipeable');
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
   test('note stats helpers count words and format labels', () {
     expect(countWords(''), 0);
     expect(countWords('  \n '), 0);

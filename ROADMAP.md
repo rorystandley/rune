@@ -106,8 +106,11 @@ tracking. Effort is a rough T-shirt size for the client-side work.
    count, and reading time. Counts follow the live editor text rather than
    trailing the debounced autosave. Writers love a word count. (Small.)
 
-7. **Swipe actions in the list.** Swipe a row to pin or delete, with haptics — the
-   standard mobile idiom, currently absent. (Small.)
+7. **Swipe actions in the list.** Implemented: swipe a row from the leading edge
+   to pin/unpin (the row springs back), or towards the trailing edge to delete —
+   into Recently Deleted with the usual Undo snackbar — each with a haptic tick.
+   The same actions are exposed to assistive tech as custom semantics actions.
+   The standard mobile idiom. (Small.)
 
 8. **Markdown preview (read mode).** An optional, off-by-default toggle that renders
    headings / lists / links and tappable `- [ ]` checkboxes while the editor stays
