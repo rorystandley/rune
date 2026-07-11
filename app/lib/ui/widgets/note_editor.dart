@@ -5,6 +5,7 @@ import 'package:notes_core/notes_core.dart';
 
 import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
+import 'markdown_preview.dart';
 
 /// The title + body editor with debounced autosave.
 ///
@@ -32,12 +33,18 @@ class EditorInsertHandle {
 }
 
 class NoteEditorView extends StatefulWidget {
-  const NoteEditorView({super.key, required this.note, this.insertHandle});
+  const NoteEditorView(
+      {super.key, required this.note, this.insertHandle, this.readMode = false});
 
   final Note note;
 
   /// Optional bridge letting the surrounding chrome insert into the live body.
   final EditorInsertHandle? insertHandle;
+
+  /// When true, the body renders as a read-only Markdown preview (headings,
+  /// lists, links, tappable checkboxes) instead of the text field. Off by
+  /// default — the editor itself always stays plain text.
+  final bool readMode;
 
   @override
   State<NoteEditorView> createState() => _NoteEditorViewState();
@@ -102,6 +109,9 @@ class _NoteEditorViewState extends State<NoteEditorView> {
       text: '$before$piece$after',
       selection: TextSelection.collapsed(offset: (before + piece).length),
     );
+    // The preview renders from _body.text at build time, so it needs a nudge —
+    // the text field variant listens to the controller directly.
+    if (widget.readMode) setState(() {});
     _onChanged();
   }
 
@@ -151,6 +161,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
   }
 
   Widget _buildEditor(ThemeData theme) {
+    if (widget.readMode) return _buildPreview(theme);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -185,6 +196,34 @@ class _NoteEditorViewState extends State<NoteEditorView> {
               border: InputBorder.none,
               isCollapsed: true,
             ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Read mode: the same title/body content, rendered instead of editable.
+  /// Checkbox toggles rewrite the live body and go through the normal
+  /// debounced autosave — the only mutation preview mode allows.
+  Widget _buildPreview(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_title.text.trim().isNotEmpty) ...[
+          Text(
+            _title.text,
+            style:
+                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+        ],
+        Expanded(
+          child: MarkdownPreview(
+            body: _body.text,
+            onBodyChanged: (next) {
+              setState(() => _body.text = next);
+              _onChanged();
+            },
           ),
         ),
       ],

@@ -112,9 +112,13 @@ tracking. Effort is a rough T-shirt size for the client-side work.
    The same actions are exposed to assistive tech as custom semantics actions.
    The standard mobile idiom. (Small.)
 
-8. **Markdown preview (read mode).** An optional, off-by-default toggle that renders
-   headings / lists / links and tappable `- [ ]` checkboxes while the editor stays
-   plain text. Keeps WYSIWYG out; checklists alone win a lot of users. (Medium.)
+8. **Markdown preview (read mode).** Implemented: an optional, off-by-default
+   toggle in the editor renders headings, bulleted / numbered lists, links
+   (tap to copy — the app never opens a browser), and tappable `- [ ]`
+   checkboxes that write back through the normal autosave. The editor itself
+   stays plain text, the renderer is a small hand-rolled one (no new
+   dependency), and every note opens in edit mode. Keeps WYSIWYG out;
+   checklists alone win a lot of users. (Medium.)
 
 9. **Share & single-note export.** Native share sheet / "copy as text" for one note,
    plus single-note encrypted export — today it is all-or-nothing from Settings.
@@ -127,7 +131,6 @@ tracking. Effort is a rough T-shirt size for the client-side work.
 
 ## Smaller follow-ups
 
-- Markdown preview toggle (kept optional; the editor stays plain by default).
 - Tags or folders (only if they don't complicate the calm UX).
 - Configurable Argon2id presets (interactive / sensitive) in settings.
 - Localization / RTL.

@@ -10,6 +10,7 @@ import 'package:notes_app/platform/biometric_unlock_store.dart';
 import 'package:notes_app/state/app_controller.dart';
 import 'package:notes_app/state/app_scope.dart';
 import 'package:notes_app/state/app_settings.dart';
+import 'package:notes_app/ui/widgets/markdown_preview.dart';
 import 'package:notes_app/ui/widgets/note_editor.dart';
 import 'package:notes_app/ui/widgets/note_info_sheet.dart';
 import 'package:notes_app/ui/widgets/note_list.dart';
@@ -1240,6 +1241,104 @@ void main() {
     await tester.runAsync(() async {
       if (await root.exists()) await root.delete(recursive: true);
     });
+  });
+
+  testWidgets('markdown preview renders and checkboxes write back', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    late Note note;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_md_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      note = await controller.newNote();
+      await controller.saveNote(
+        note.id,
+        title: 'Plan',
+        body: '# Groceries\n- [ ] milk\n- [x] eggs\n- plain item\n'
+            '1. first\nSee [the docs](https://example.com) today',
+      );
+    });
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+    controller.selectNote(note.id);
+    await tester.pumpAndSettle();
+
+    // Plain editor by default — read mode is opt-in.
+    expect(find.byKey(const Key('editor-body')), findsOneWidget);
+    expect(find.byType(Checkbox), findsNothing);
+
+    await tester.tap(find.byKey(const Key('preview-toggle')));
+    await tester.pumpAndSettle();
+
+    // The body renders as blocks instead of a text field.
+    expect(find.byKey(const Key('editor-body')), findsNothing);
+    expect(find.text('Groceries'), findsWidgets); // heading
+    expect(find.byType(Checkbox), findsNWidgets(2));
+    expect(find.text('plain item'), findsOneWidget);
+    expect(find.text('first'), findsOneWidget);
+
+    // Tapping the unchecked box rewrites the underlying `[ ]` to `[x]`.
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump();
+    // Tapping a link copies it (never opens a browser).
+    await tester.tapOnText(find.textRange.ofSubstring('the docs'));
+    await tester.pumpAndSettle();
+    expect(find.text('Link copied'), findsOneWidget);
+
+    // Back to the editor: the flipped marker is in the body text.
+    await tester.tap(find.byKey(const Key('preview-toggle')));
+    await tester.pumpAndSettle();
+    final body =
+        tester.widget<TextField>(find.byKey(const Key('editor-body')));
+    expect(body.controller!.text, contains('- [x] milk'));
+
+    // Let the pending autosave debounce finish before teardown.
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pumpAndSettle();
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
+  test('parseMarkdown classifies note lines', () {
+    final lines = parseMarkdown(
+      '## Head\n- [ ] todo\n- [X] done\n* star\n2) second\n\nplain',
+    );
+    expect(lines[0].kind, MarkdownLineKind.heading);
+    expect(lines[0].level, 2);
+    expect(lines[0].text, 'Head');
+    expect(lines[1].kind, MarkdownLineKind.task);
+    expect(lines[1].checked, isFalse);
+    expect(lines[2].kind, MarkdownLineKind.task);
+    expect(lines[2].checked, isTrue);
+    expect(lines[3].kind, MarkdownLineKind.bullet);
+    expect(lines[3].text, 'star');
+    expect(lines[4].kind, MarkdownLineKind.numbered);
+    expect(lines[4].ordinal, '2');
+    expect(lines[5].kind, MarkdownLineKind.blank);
+    expect(lines[6].kind, MarkdownLineKind.paragraph);
+  });
+
+  test('toggleTask flips only the addressed checkbox line', () {
+    const body = '- [ ] a\n- [x] b\nplain';
+    expect(toggleTask(body, 0), '- [x] a\n- [x] b\nplain');
+    expect(toggleTask(body, 1), '- [ ] a\n- [ ] b\nplain');
+    // Not a task line / out of range: unchanged.
+    expect(toggleTask(body, 2), body);
+    expect(toggleTask(body, 9), body);
   });
 
   test('note stats helpers count words and format labels', () {
