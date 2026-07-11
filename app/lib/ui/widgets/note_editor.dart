@@ -17,12 +17,18 @@ import '../../state/app_scope.dart';
 /// mounted editor attaches its insert function; callers invoke [insert].
 class EditorInsertHandle {
   void Function(String text)? _insert;
+  ({String title, String body}) Function()? _read;
 
   /// Whether an editor is currently mounted and listening.
   bool get isAttached => _insert != null;
 
   /// Inserts [text] into the open editor body, if one is mounted.
   void insert(String text) => _insert?.call(text);
+
+  /// The editor's current (possibly not-yet-autosaved) title and body, or null
+  /// when no editor is mounted. Lets chrome like the note-info sheet report on
+  /// what's on screen instead of trailing the debounced autosave.
+  ({String title, String body})? readCurrent() => _read?.call();
 }
 
 class NoteEditorView extends StatefulWidget {
@@ -51,6 +57,7 @@ class _NoteEditorViewState extends State<NoteEditorView> {
   void initState() {
     super.initState();
     widget.insertHandle?._insert = _insertTranscript;
+    widget.insertHandle?._read = _readCurrent;
   }
 
   @override
@@ -64,12 +71,18 @@ class _NoteEditorViewState extends State<NoteEditorView> {
     if (identical(widget.insertHandle?._insert, _insertTranscript)) {
       widget.insertHandle?._insert = null;
     }
+    if (identical(widget.insertHandle?._read, _readCurrent)) {
+      widget.insertHandle?._read = null;
+    }
     _debounce?.cancel();
     _flush(); // best-effort save of any pending edits
     _title.dispose();
     _body.dispose();
     super.dispose();
   }
+
+  ({String title, String body}) _readCurrent() =>
+      (title: _title.text, body: _body.text);
 
   /// Inserts [text] at the cursor (or appends), on its own line when there is
   /// preceding content, then schedules the normal debounced autosave.

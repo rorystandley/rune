@@ -11,6 +11,7 @@ import 'package:notes_app/state/app_controller.dart';
 import 'package:notes_app/state/app_scope.dart';
 import 'package:notes_app/state/app_settings.dart';
 import 'package:notes_app/ui/widgets/note_editor.dart';
+import 'package:notes_app/ui/widgets/note_info_sheet.dart';
 import 'package:notes_app/ui/widgets/note_list.dart';
 import 'package:notes_core/notes_core.dart';
 
@@ -1092,6 +1093,84 @@ void main() {
     expect(
       highlightMatches('plain', '  ', highlight: style).single.text,
       'plain',
+    );
+  });
+
+  testWidgets('note info sheet shows live counts and timestamps', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    late Note note;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_info_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      note = await controller.newNote();
+      await controller.saveNote(note.id, title: 'Hello', body: 'one two three');
+    });
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    controller.selectNote(note.id);
+    await tester.pumpAndSettle();
+
+    // The persisted note: 3 words, 13 characters, minimum reading time.
+    await tester.tap(find.byKey(const Key('note-info-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Words'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+    expect(find.text('Characters'), findsOneWidget);
+    expect(find.text('13'), findsOneWidget);
+    expect(find.text('Reading time'), findsOneWidget);
+    expect(find.text('~1 min'), findsOneWidget);
+    expect(find.text('Created'), findsOneWidget);
+    expect(find.text('Modified'), findsOneWidget);
+
+    // Dismiss the sheet, type into the open editor, and reopen the sheet
+    // before the debounced autosave fires — the counts follow the live text.
+    await tester.tapAt(const Offset(400, 20));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('editor-body')),
+      'now there are five words',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('note-info-button')));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('5'), findsOneWidget);
+
+    // Let the pending autosave debounce fire and its write complete so no
+    // timer or I/O outlives the test.
+    await tester.tapAt(const Offset(400, 20));
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pumpAndSettle();
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
+  test('note stats helpers count words and format labels', () {
+    expect(countWords(''), 0);
+    expect(countWords('  \n '), 0);
+    expect(countWords('one two\nthree'), 3);
+    expect(readingTimeLabel(0), '—');
+    expect(readingTimeLabel(1), '~1 min');
+    expect(readingTimeLabel(500), '~3 min');
+    expect(
+      formatFullTimestamp(DateTime(2026, 7, 11, 9, 5)),
+      '11 Jul 2026, 09:05',
     );
   });
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../state/app_scope.dart';
 import '../widgets/note_actions.dart';
 import '../widgets/note_editor.dart';
+import '../widgets/note_info_sheet.dart';
 import '../widgets/voice_note_sheet.dart';
 
 /// Full-screen note editor used on narrow (mobile) layouts.
@@ -30,6 +31,16 @@ class _EditorScreenState extends State<EditorScreen> {
     return Scaffold(
       appBar: AppBar(
         actions: [
+          IconButton(
+            key: const Key('note-info-button'),
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'Note info',
+            onPressed: () => showNoteInfoSheet(
+              context,
+              note: note,
+              live: _insertHandle.readCurrent(),
+            ),
+          ),
           IconButton(
             icon: Icon(note.pinned ? Icons.push_pin : Icons.push_pin_outlined),
             tooltip: note.pinned ? 'Unpin' : 'Pin to top',

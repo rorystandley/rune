@@ -7,6 +7,9 @@ All notable changes to Rune are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Note info sheet.** An info button in the editor opens a sheet showing the
+  note's created and modified times, word count, character count, and reading
+  time — computed from the text currently on screen.
 - **Search that shows its work.** Searching now shows a result count and
   highlights the matched text in each row's title and preview. When the match
   is buried deeper in a note, the preview swaps to an excerpt of the matching
