@@ -10,10 +10,10 @@
 // ignore_for_file: unnecessary_nullable_for_final_variable_declarations
 
 /// Semantic version, e.g. "0.3.0".
-const String kAppVersion = '0.3.1';
+const String kAppVersion = '0.4.0';
 
 /// Build number (the `+N` suffix), or null when the pubspec has none.
-const String? kAppBuildNumber = '5';
+const String? kAppBuildNumber = '6';
 
 /// Human-readable version shown in Settings, e.g. "0.3.0 (build 3)".
-const String kAppVersionDisplay = '0.3.1 (build 5)';
+const String kAppVersionDisplay = '0.4.0 (build 6)';
