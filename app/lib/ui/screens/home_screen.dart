@@ -157,6 +157,7 @@ class _WideHomeState extends State<_WideHome> {
                       selectedId: controller.selectedId,
                       searchController: _searchController,
                       searchFocusNode: _searchFocus,
+                      onSearchDismiss: _clearSearch,
                       onOpen: (note) => controller.selectNote(note.id),
                       onNew: () => controller.newNote(),
                     ),
@@ -200,11 +201,12 @@ class _WideHomeState extends State<_WideHome> {
 /// search, ⌘L lock, ⌘⌫ delete the selected note, and Esc to clear search. The
 /// modifier follows the platform — Cmd on macOS, Ctrl elsewhere.
 ///
-/// Note on Esc: while a text field is the focused first responder, macOS turns
-/// a bare Escape into the `cancelOperation:` command and consumes it below the
-/// framework, so this binding can't fire from inside the search field there
-/// (it still works elsewhere, and everywhere on Windows/Linux). The search
-/// field's own clear (×) button is the reliable clear-while-typing affordance.
+/// Esc is delivered two different ways. Everywhere except a focused macOS text
+/// field it arrives as a key event, caught by the [SingleActivator] below. But
+/// while a text field is the focused first responder, macOS turns a bare Escape
+/// into the `cancelOperation:` command, which the framework routes to a
+/// [DismissIntent] at the field rather than the key-event path — so that case is
+/// handled next to the search field in [NoteList] (via `onSearchDismiss`).
 class _HomeShortcuts extends StatelessWidget {
   const _HomeShortcuts({
     required this.focusNode,

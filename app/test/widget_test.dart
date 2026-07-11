@@ -868,6 +868,71 @@ void main() {
     }
   });
 
+  testWidgets('macOS Escape-in-search (DismissIntent path) clears the query', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    late Directory root;
+    late AppController controller;
+    try {
+      await tester.runAsync(() async {
+        root = await Directory.systemTemp.createTemp('notes_dismiss_test_');
+        controller = _newController(root);
+        await controller.settingsStore.save(
+          const AppSettings(autoLockMinutes: 0),
+        );
+        await controller.init();
+        await controller.createVault('passphrase123');
+        final n = await controller.newNote();
+        await controller.saveNote(n.id, title: 'Findable', body: '');
+      });
+
+      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(NotesApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      // Focus the search field and enter a query — this opens a text-input
+      // connection, exactly as on device.
+      await tester.tap(find.byKey(const Key('search-field')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('search-field')), 'Findable');
+      await tester.pumpAndSettle();
+      expect(controller.search, 'Findable');
+
+      // Simulate what macOS delivers for a bare Escape in a focused field:
+      // cancelOperation: -> TextInputClient.performSelectors. This is the path a
+      // key event can't take on macOS, and the one the DismissIntent handler
+      // exists to catch.
+      await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+        SystemChannels.textInput.name,
+        SystemChannels.textInput.codec.encodeMethodCall(
+          const MethodCall('TextInputClient.performSelectors', <dynamic>[
+            -1,
+            <String>['cancelOperation:'],
+          ]),
+        ),
+        (_) {},
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.search, isEmpty);
+      final searchField =
+          tester.widget<TextField>(find.byKey(const Key('search-field')));
+      expect(searchField.controller!.text, isEmpty);
+
+      controller.dispose();
+      await tester.runAsync(() async {
+        if (await root.exists()) await root.delete(recursive: true);
+      });
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('wide search field seeds from the active query', (
     tester,
   ) async {
