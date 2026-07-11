@@ -7,6 +7,10 @@ All notable changes to Rune are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Search that shows its work.** Searching now shows a result count and
+  highlights the matched text in each row's title and preview. When the match
+  is buried deeper in a note, the preview swaps to an excerpt of the matching
+  line so the hit is visible.
 - **Desktop keyboard shortcuts.** The two-pane layout now responds to ⌘N (new
   note), ⌘F (focus search), ⌘⌫ (delete the selected note), ⌘L (lock), and Esc
   (clear search) — using Ctrl instead of Cmd on Windows and Linux. The search
