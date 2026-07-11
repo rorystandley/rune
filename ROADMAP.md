@@ -120,9 +120,13 @@ tracking. Effort is a rough T-shirt size for the client-side work.
    dependency), and every note opens in edit mode. Keeps WYSIWYG out;
    checklists alone win a lot of users. (Medium.)
 
-9. **Share & single-note export.** Native share sheet / "copy as text" for one note,
-   plus single-note encrypted export — today it is all-or-nothing from Settings.
-   Pairs with the file-picker / share-sheet work in item 8 above. (Medium.)
+9. **Share & single-note export.** Implemented: a share button in the editor
+   (both layouts) offers the native share sheet (`share_plus`), "copy as text",
+   and an encrypted single-note export in the same format as a full backup (so
+   it restores the same way, and stays ciphertext-only). Sharing/copying use
+   the live editor text; the encrypted export saves pending edits first.
+   Choosing the destination via a native file picker remains with item 8
+   above. (Medium.)
 
 10. **Trustworthy first run.** A passphrase-strength meter on vault creation (zxcvbn,
     from item 10 above) and a warmer first-run empty state that reassures ("encrypted

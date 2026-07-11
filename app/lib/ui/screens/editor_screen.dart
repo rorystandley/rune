@@ -4,6 +4,7 @@ import '../../state/app_scope.dart';
 import '../widgets/note_actions.dart';
 import '../widgets/note_editor.dart';
 import '../widgets/note_info_sheet.dart';
+import '../widgets/note_share_sheet.dart';
 import '../widgets/voice_note_sheet.dart';
 
 /// Full-screen note editor used on narrow (mobile) layouts.
@@ -46,6 +47,16 @@ class _EditorScreenState extends State<EditorScreen> {
             icon: const Icon(Icons.info_outline),
             tooltip: 'Note info',
             onPressed: () => showNoteInfoSheet(
+              context,
+              note: note,
+              live: _insertHandle.readCurrent(),
+            ),
+          ),
+          IconButton(
+            key: const Key('note-share-button'),
+            icon: const Icon(Icons.ios_share),
+            tooltip: 'Share or export',
+            onPressed: () => showNoteShareSheet(
               context,
               note: note,
               live: _insertHandle.readCurrent(),

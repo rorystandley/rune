@@ -6,6 +6,7 @@ import '../widgets/note_actions.dart';
 import '../widgets/note_editor.dart';
 import '../widgets/note_info_sheet.dart';
 import '../widgets/note_list.dart';
+import '../widgets/note_share_sheet.dart';
 import '../widgets/voice_note_sheet.dart';
 import 'editor_screen.dart';
 import 'settings_screen.dart';
@@ -193,6 +194,11 @@ class _WideHomeState extends State<_WideHome> {
                             note: selected,
                             live: _insertHandle.readCurrent(),
                           ),
+                          onShare: () => showNoteShareSheet(
+                            context,
+                            note: selected,
+                            live: _insertHandle.readCurrent(),
+                          ),
                           onTogglePreview: () =>
                               setState(() => _readMode = !_readMode),
                         ),
@@ -370,11 +376,13 @@ class _EditorToolbar extends StatelessWidget {
       required this.readMode,
       required this.onVoice,
       required this.onInfo,
+      required this.onShare,
       required this.onTogglePreview});
   final String noteId;
   final bool readMode;
   final VoidCallback onVoice;
   final VoidCallback onInfo;
+  final VoidCallback onShare;
   final VoidCallback onTogglePreview;
 
   @override
@@ -397,6 +405,12 @@ class _EditorToolbar extends StatelessWidget {
             icon: const Icon(Icons.info_outline),
             tooltip: 'Note info',
             onPressed: onInfo,
+          ),
+          IconButton(
+            key: const Key('note-share-button'),
+            icon: const Icon(Icons.ios_share),
+            tooltip: 'Share or export',
+            onPressed: onShare,
           ),
           IconButton(
             icon: Icon(pinned ? Icons.push_pin : Icons.push_pin_outlined),

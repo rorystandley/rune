@@ -25,10 +25,27 @@ class ExportService {
   /// Bundles the vault header (KDF params, salt, wrapped key) and every
   /// encrypted note blob. Contains NO plaintext — it can only be opened with
   /// the same passphrase. Does not require the vault to be unlocked.
-  Future<File> exportEncryptedBackup(File target) async {
+  Future<File> exportEncryptedBackup(File target) async =>
+      _writeEncryptedBundle(target, await store.listNoteIds());
+
+  /// Writes a fully-encrypted export of a single note to [target].
+  ///
+  /// Exactly the backup format, just with one entry — so a single-note export
+  /// restores the same way a full backup does, and carries the vault header it
+  /// needs. Contains NO plaintext. Throws [ArgumentError] when [noteId] has no
+  /// stored blob.
+  Future<File> exportEncryptedNote(File target, String noteId) async {
+    final ids = await store.listNoteIds();
+    if (!ids.contains(noteId)) {
+      throw ArgumentError.value(noteId, 'noteId', 'Unknown note');
+    }
+    return _writeEncryptedBundle(target, [noteId]);
+  }
+
+  Future<File> _writeEncryptedBundle(File target, List<String> ids) async {
     final meta = await store.readMetadata();
     final notes = <String, String>{};
-    for (final id in await store.listNoteIds()) {
+    for (final id in ids) {
       notes[id] = base64.encode(await store.readNoteBlob(id));
     }
     final payload = <String, dynamic>{
