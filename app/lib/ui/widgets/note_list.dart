@@ -121,6 +121,22 @@ class _NoteListState extends State<NoteList> {
             ),
           ),
         ),
+        // While searching, say how many notes matched — the difference between
+        // "did anything happen?" and a real tool. The empty state already
+        // covers the zero case.
+        if (controller.search.trim().isNotEmpty && notes.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                notes.length == 1 ? '1 result' : '${notes.length} results',
+                key: const Key('search-result-count'),
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: theme.hintColor),
+              ),
+            ),
+          ),
         Expanded(
           child: notes.isEmpty
               ? _EmptyList(
@@ -178,6 +194,7 @@ class _NoteListState extends State<NoteList> {
 
   Widget _noteTile(AppController controller, Note note) => _NoteTile(
         note: note,
+        query: controller.search,
         selected: note.id == widget.selectedId,
         onTap: () => widget.onOpen(note),
         onTogglePin: () => controller.togglePinned(note.id),
@@ -217,11 +234,16 @@ class _SectionHeader extends StatelessWidget {
 class _NoteTile extends StatelessWidget {
   const _NoteTile(
       {required this.note,
+      required this.query,
       required this.selected,
       required this.onTap,
       required this.onTogglePin});
 
   final Note note;
+
+  /// The live search query; matched runs in the title/preview are highlighted
+  /// so search shows its work. Empty when not searching.
+  final String query;
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onTogglePin;
@@ -242,11 +264,23 @@ class _NoteTile extends StatelessWidget {
   }
 
   Widget _buildTile(ThemeData theme, BuildContext context) {
+    final highlight = TextStyle(
+      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.25),
+      fontWeight: FontWeight.w600,
+    );
+    // While searching, prefer an excerpt around the body match over the plain
+    // first-line preview, so a hit buried mid-note is actually visible.
+    final snippet = searchSnippet(note.body, query);
+    final previewText = snippet ??
+        (note.preview.isEmpty ? 'No additional text' : note.preview);
     return ListTile(
       selected: selected,
       selectedTileColor: theme.colorScheme.primary.withValues(alpha: 0.10),
-      title: Text(
-        note.displayTitle,
+      title: Text.rich(
+        TextSpan(
+          children:
+              highlightMatches(note.displayTitle, query, highlight: highlight),
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontWeight: FontWeight.w600),
@@ -257,8 +291,11 @@ class _NoteTile extends StatelessWidget {
               style: theme.textTheme.bodySmall),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              note.preview.isEmpty ? 'No additional text' : note.preview,
+            child: Text.rich(
+              TextSpan(
+                children:
+                    highlightMatches(previewText, query, highlight: highlight),
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
@@ -362,6 +399,51 @@ class _EmptyList extends StatelessWidget {
       ),
     );
   }
+}
+
+/// [text] split into spans with every case-insensitive occurrence of [query]
+/// styled by [highlight]. A single unstyled span when the (trimmed) query is
+/// empty or nothing matches.
+List<TextSpan> highlightMatches(String text, String query,
+    {required TextStyle highlight}) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty || text.isEmpty) return [TextSpan(text: text)];
+  final lower = text.toLowerCase();
+  final spans = <TextSpan>[];
+  var from = 0;
+  while (true) {
+    final at = lower.indexOf(q, from);
+    if (at < 0) break;
+    if (at > from) spans.add(TextSpan(text: text.substring(from, at)));
+    spans.add(
+        TextSpan(text: text.substring(at, at + q.length), style: highlight));
+    from = at + q.length;
+  }
+  if (spans.isEmpty) return [TextSpan(text: text)];
+  if (from < text.length) spans.add(TextSpan(text: text.substring(from)));
+  return spans;
+}
+
+/// A single-line excerpt of [body] around its first case-insensitive match of
+/// [query], or null when the (trimmed) query is empty or absent from the body.
+/// Used in place of the first-line preview while searching. When the match
+/// sits deep in its line, the excerpt starts shortly before it (with a leading
+/// ellipsis) so the match survives the row's single-line truncation.
+String? searchSnippet(String body, String query) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) return null;
+  final at = body.toLowerCase().indexOf(q);
+  if (at < 0) return null;
+  // The query comes from a single-line field, so the match sits within one
+  // line of the body.
+  final lineStart = body.lastIndexOf('\n', at) + 1;
+  final lineEnd = body.indexOf('\n', at);
+  final line = body.substring(lineStart, lineEnd < 0 ? body.length : lineEnd);
+  final trimmed = line.trimLeft();
+  final matchAt = at - lineStart - (line.length - trimmed.length);
+  const keepBefore = 16;
+  if (matchAt > 24) return '…${trimmed.substring(matchAt - keepBefore)}';
+  return trimmed.trimRight();
 }
 
 /// Short, locale-agnostic date label for a note row.

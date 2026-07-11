@@ -11,6 +11,7 @@ import 'package:notes_app/state/app_controller.dart';
 import 'package:notes_app/state/app_scope.dart';
 import 'package:notes_app/state/app_settings.dart';
 import 'package:notes_app/ui/widgets/note_editor.dart';
+import 'package:notes_app/ui/widgets/note_list.dart';
 import 'package:notes_core/notes_core.dart';
 
 // NOTE: anything that touches the filesystem (createTemp, settings load,
@@ -1016,7 +1017,126 @@ void main() {
       if (await root.exists()) await root.delete(recursive: true);
     });
   });
+
+  testWidgets('search shows a result count and highlights matches', (
+    tester,
+  ) async {
+    late Directory root;
+    late AppController controller;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('notes_hilite_test_');
+      controller = _newController(root);
+      await controller.settingsStore.save(
+        const AppSettings(autoLockMinutes: 0),
+      );
+      await controller.init();
+      await controller.createVault('passphrase123');
+      final a = await controller.newNote();
+      await controller.saveNote(a.id, title: 'Groceries', body: 'milk\neggs');
+      final b = await controller.newNote();
+      await controller.saveNote(
+        b.id,
+        title: 'Meeting',
+        body: 'agenda first\nthen the budget numbers for next year',
+      );
+    });
+
+    await tester.pumpWidget(NotesApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    // No count while not searching.
+    expect(find.byKey(const Key('search-result-count')), findsNothing);
+
+    // A title match: count appears and the matched run in the title is
+    // highlighted.
+    await tester.enterText(find.byKey(const Key('search-field')), 'groc');
+    await tester.pumpAndSettle();
+    expect(find.text('1 result'), findsOneWidget);
+    expect(_highlightedRun('Groc'), findsOneWidget);
+
+    // A body match on a later line: the row's preview swaps to a snippet of
+    // the matching line, with the match highlighted.
+    await tester.enterText(find.byKey(const Key('search-field')), 'budget');
+    await tester.pumpAndSettle();
+    expect(find.text('1 result'), findsOneWidget);
+    expect(_highlightedRun('budget'), findsOneWidget);
+    expect(
+      _richTextContaining('then the budget numbers'),
+      findsOneWidget,
+    );
+
+    // Both notes match 'e' — plural count.
+    await tester.enterText(find.byKey(const Key('search-field')), 'e');
+    await tester.pumpAndSettle();
+    expect(find.text('2 results'), findsOneWidget);
+
+    controller.dispose();
+    await tester.runAsync(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+  });
+
+  test('highlightMatches splits every case-insensitive occurrence', () {
+    const style = TextStyle(backgroundColor: Color(0xFFFFF176));
+    final spans = highlightMatches('Tea and TEAPOT', 'tea', highlight: style);
+    expect(spans.map((s) => s.text).toList(), ['Tea', ' and ', 'TEA', 'POT']);
+    expect(spans[0].style, style);
+    expect(spans[1].style, isNull);
+    expect(spans[2].style, style);
+
+    // No match / empty query: one unstyled span, text untouched.
+    expect(
+      highlightMatches('plain', 'zzz', highlight: style).single.style,
+      isNull,
+    );
+    expect(
+      highlightMatches('plain', '  ', highlight: style).single.text,
+      'plain',
+    );
+  });
+
+  test('searchSnippet excerpts the matching line', () {
+    // Match on a later line: that line is returned, not the first one.
+    expect(
+      searchSnippet('first line\n  the budget line  ', 'budget'),
+      'the budget line',
+    );
+    // A match deep into a long line keeps context just before the match.
+    final long = 'x' * 40;
+    expect(
+      searchSnippet('$long budget etc', 'budget'),
+      '…${'x' * 15} budget etc',
+    );
+    // Absent or empty queries give nothing.
+    expect(searchSnippet('body', 'zzz'), isNull);
+    expect(searchSnippet('body', '   '), isNull);
+  });
 }
+
+/// Finds a [RichText] containing a span whose text is exactly [fragment] and
+/// carries a highlight (background colour) — how the list marks search matches.
+Finder _highlightedRun(String fragment) =>
+    find.byWidgetPredicate((widget) {
+      if (widget is! RichText) return false;
+      var found = false;
+      widget.text.visitChildren((span) {
+        if (span is TextSpan &&
+            span.text == fragment &&
+            span.style?.backgroundColor != null) {
+          found = true;
+          return false;
+        }
+        return true;
+      });
+      return found;
+    });
+
+/// Finds a [RichText] whose flattened text contains [fragment] — plain
+/// [find.textContaining] does not see inside spans built via [Text.rich].
+Finder _richTextContaining(String fragment) => find.byWidgetPredicate(
+      (widget) =>
+          widget is RichText && widget.text.toPlainText().contains(fragment),
+    );
 
 /// Sends a Cmd+[key] chord (macOS modifier) and settles the frame.
 Future<void> _sendCmd(WidgetTester tester, LogicalKeyboardKey key) =>

@@ -95,9 +95,11 @@ tracking. Effort is a rough T-shirt size for the client-side work.
    clear (×) button for pointer users. The two-pane layout already signals
    "desktop"; power users expect these. (Small.)
 
-5. **Search that shows its work.** Highlight the matched substring in the title /
-   preview and show a result count. Turns search from "did anything happen?" into
-   a real tool. (Small.)
+5. **Search that shows its work.** Implemented: while searching, the list shows
+   a result count and highlights every matched run in the title and preview;
+   when the match sits deeper in the body, the row's preview swaps to an excerpt
+   of the matching line so the hit is actually visible. Turns search from "did
+   anything happen?" into a real tool. (Small.)
 
 6. **Note info sheet.** Created / modified timestamps, word count, character count,
    and reading time in a tap-to-open sheet. The editor surfaces none of this today;
