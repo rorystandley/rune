@@ -33,6 +33,12 @@ ThemeData buildTheme(Brightness brightness) {
       border: OutlineInputBorder(),
       isDense: true,
     ),
+    // Floating keeps snackbars clear of the iPhone home-indicator area; the
+    // default fixed bar stretches into it and leaves a slab of dead space
+    // under the text.
+    snackBarTheme: const SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+    ),
     visualDensity: VisualDensity.adaptivePlatformDensity,
   );
 }

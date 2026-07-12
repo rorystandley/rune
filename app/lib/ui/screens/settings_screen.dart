@@ -402,7 +402,7 @@ class _PrivacyPostureCard extends StatelessWidget {
     final theme = Theme.of(context);
     const items = [
       'No telemetry, analytics, or tracking',
-      'No network calls — works fully offline',
+      'No network calls, works fully offline',
       'Notes encrypted at rest (XChaCha20-Poly1305)',
       'Key derived from your passphrase (Argon2id)',
       'No account, no cloud, no third parties',

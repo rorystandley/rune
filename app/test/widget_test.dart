@@ -1450,7 +1450,7 @@ void main() {
 
     expect(find.text('No notes yet'), findsOneWidget);
     expect(
-      find.textContaining('encrypted — no account, no cloud'),
+      find.textContaining('encrypted. No account, no cloud'),
       findsOneWidget,
     );
     expect(find.byKey(const Key('empty-new-note-button')), findsOneWidget);
