@@ -37,22 +37,47 @@ CONFIG="${CONFIGURATION:-Release}"
 BUILD_DIR="$APP_DIR/build/whisper/macos"
 CMAKE_DIR="$BUILD_DIR/cmake"
 
+# Compile with debug info so dsymutil can produce a dSYM below. The flags are
+# additive: Release still gets its usual -O3 -DNDEBUG.
 cmake \
   -S "$ROOT_DIR/native/whisper" \
   -B "$CMAKE_DIR" \
   -DCMAKE_BUILD_TYPE="$CONFIG" \
+  -DCMAKE_C_FLAGS="-g" \
+  -DCMAKE_CXX_FLAGS="-g" \
   -DWHISPER_CPP_SOURCE_DIR="$SOURCE_DIR" \
   ${MACOSX_DEPLOYMENT_TARGET:+-DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET"}
 
 cmake --build "$CMAKE_DIR" --config "$CONFIG" --target rune_whisper --parallel
 
 LIBRARY="$CMAKE_DIR/bin/librune_whisper.dylib"
+DSYM="$CMAKE_DIR/bin/librune_whisper.dylib.dSYM"
+
+# Extract the DWARF into a dSYM while the intermediate .o files still exist,
+# then strip the dylib back down so the shipped binary stays lean (-x keeps
+# the exported rune_whisper_* symbols). Only do this after a fresh link:
+# strip removes the debug map, so rerunning dsymutil on an unchanged dylib
+# would overwrite the dSYM with an empty one.
+if [ ! -d "$DSYM" ] || [ "$LIBRARY" -nt "$DSYM" ]; then
+  xcrun dsymutil "$LIBRARY" -o "$DSYM"
+  xcrun strip -x "$LIBRARY"
+  touch "$DSYM"
+fi
+
 mkdir -p "$BUILD_DIR"
 cp "$LIBRARY" "$BUILD_DIR/librune_whisper.dylib"
 
 if [ -n "${BUILT_PRODUCTS_DIR:-}" ] && [ -n "${FRAMEWORKS_FOLDER_PATH:-}" ]; then
   mkdir -p "$BUILT_PRODUCTS_DIR/$FRAMEWORKS_FOLDER_PATH"
   cp "$LIBRARY" "$BUILT_PRODUCTS_DIR/$FRAMEWORKS_FOLDER_PATH/librune_whisper.dylib"
+fi
+
+# Archive/install builds collect dSYMs from DWARF_DSYM_FOLDER_PATH; drop ours
+# there so App Store uploads stop warning about missing librune_whisper symbols.
+if [ -n "${DWARF_DSYM_FOLDER_PATH:-}" ]; then
+  mkdir -p "$DWARF_DSYM_FOLDER_PATH"
+  rm -rf "$DWARF_DSYM_FOLDER_PATH/librune_whisper.dylib.dSYM"
+  cp -R "$DSYM" "$DWARF_DSYM_FOLDER_PATH/librune_whisper.dylib.dSYM"
 fi
 
 echo "Built $LIBRARY"
