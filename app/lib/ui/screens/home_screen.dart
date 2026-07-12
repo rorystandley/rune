@@ -39,6 +39,11 @@ class _NarrowHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
+    // The first-run empty state leads with its own "New note" call to action,
+    // so the FAB would be a second, differently-styled control for the same
+    // action on the same screen. One primary action at a time.
+    final emptyStateShowing =
+        controller.visibleNotes.isEmpty && controller.search.isEmpty;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rune'),
@@ -61,11 +66,13 @@ class _NarrowHome extends StatelessWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        key: const Key('new-note-button'),
-        onPressed: () => _newNote(context),
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: emptyStateShowing
+          ? null
+          : FloatingActionButton(
+              key: const Key('new-note-button'),
+              onPressed: () => _newNote(context),
+              child: const Icon(Icons.add),
+            ),
       body: NoteList(
         onOpen: (note) => _openNote(context, note.id),
         onNew: () => _newNote(context),
