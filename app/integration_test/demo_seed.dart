@@ -57,7 +57,7 @@ Future<AppController> buildSeededController() async {
     (
       'Welcome to Notes',
       'Everything you write here is encrypted on this device with your '
-          'passphrase — using AES-GCM and Argon2id.\n\n'
+          'passphrase, using XChaCha20-Poly1305 and Argon2id.\n\n'
           'No account. No cloud. No telemetry. The app works fully offline, '
           'and only ciphertext ever touches the disk.',
     ),
