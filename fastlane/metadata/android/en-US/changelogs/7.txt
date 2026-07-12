@@ -1,0 +1,8 @@
+Phone polish, same privacy posture.
+
+* Toasts float clear of the system navigation area.
+* Recently Deleted no longer sits in the screen's bottom curve.
+* Toasts dismiss when you navigate to another screen.
+* One consistent accent colour for creating notes.
+
+Still fully offline: no network, no telemetry, no accounts. Not yet audited.
