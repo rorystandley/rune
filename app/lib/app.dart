@@ -46,6 +46,22 @@ class _NotesAppState extends State<NotesApp> with WidgetsBindingObserver {
   }
 }
 
+final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
+/// Hides any visible snackbar when a new route is pushed, so a transient
+/// toast (the delete Undo, say) doesn't follow the user into Settings or a
+/// sheet. Pops are deliberately left alone: the narrow editor shows the Undo
+/// snackbar and immediately pops back to the list, which must keep it.
+class _HideSnackBarOnPush extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    // previousRoute is null for the initial route on app launch.
+    if (previousRoute != null) {
+      _messengerKey.currentState?.hideCurrentSnackBar();
+    }
+  }
+}
+
 /// Builds the [MaterialApp] from the live [AppSettings] so the in-app
 /// appearance controls (theme mode + reading text size) take effect
 /// immediately. Kept below [AppScope] so a settings change rebuilds it.
@@ -58,6 +74,8 @@ class _App extends StatelessWidget {
     return MaterialApp(
       title: 'Rune',
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: _messengerKey,
+      navigatorObservers: [_HideSnackBarOnPush()],
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
       themeMode: settings.themeMode,
