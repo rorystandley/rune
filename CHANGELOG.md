@@ -4,6 +4,26 @@ All notable changes to Rune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] - 2026-07-12
+
+Phone polish reported from 0.4.0, same privacy posture.
+
+### Fixed
+- Snackbars (such as the delete Undo toast) float clear of the phone's
+  system-navigation area instead of stretching into it with dead space under
+  the text.
+- The Recently Deleted entry no longer sits in the home-indicator curve, and
+  on phones it moved into the screen's bottom slot so the new-note button is
+  spaced above it instead of crowding its divider.
+- Transient snackbars are dismissed when navigating to another screen, so the
+  Undo toast no longer follows you into Settings.
+
+### Changed
+- One accent for creating notes: the floating new-note button now matches the
+  New note button's colour in both themes, and the empty state shows a single
+  New note call to action instead of two controls for the same action.
+- Copy tweaks to the empty-state message and the settings privacy card.
+
 ## [0.4.0] - 2026-07-11
 
 The whole user-experience section of the roadmap, finished: daily-use polish on
@@ -92,7 +112,9 @@ export behind an explicit warning), and local voice-note recording. Fully
 offline — no network, no telemetry, no accounts. On-device transcription
 shipped as a clearly-labelled stub. Not yet audited.
 
-[Unreleased]: https://github.com/rorystandley/rune/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/rorystandley/rune/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/rorystandley/rune/releases/tag/v0.4.1
+[0.4.0]: https://github.com/rorystandley/rune/releases/tag/v0.4.0
 [0.3.0]: https://github.com/rorystandley/rune/releases/tag/v0.3.0
 [0.2.0]: https://github.com/rorystandley/rune/releases/tag/v0.2.0
 [0.1.0]: https://github.com/rorystandley/rune/releases/tag/v0.1.0
