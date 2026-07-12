@@ -69,7 +69,15 @@ class _NarrowHome extends StatelessWidget {
       body: NoteList(
         onOpen: (note) => _openNote(context, note.id),
         onNew: () => _newNote(context),
+        showDeletedFooter: false,
       ),
+      // Hosting the footer here (rather than at the foot of the list) makes
+      // the Scaffold lift the FAB above it, and keeps the row itself out of
+      // the home-indicator curve via the footer's own SafeArea.
+      bottomNavigationBar:
+          controller.search.isEmpty && controller.deletedNotes.isNotEmpty
+              ? RecentlyDeletedFooter(count: controller.deletedNotes.length)
+              : null,
     );
   }
 }

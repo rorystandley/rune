@@ -20,7 +20,8 @@ class NoteList extends StatefulWidget {
       this.onNew,
       this.searchController,
       this.searchFocusNode,
-      this.onSearchDismiss});
+      this.onSearchDismiss,
+      this.showDeletedFooter = true});
 
   final void Function(Note note) onOpen;
   final String? selectedId;
@@ -39,6 +40,12 @@ class NoteList extends StatefulWidget {
   /// run its full clear (which also re-parks focus for the shortcuts); when
   /// null the list just clears the query itself.
   final VoidCallback? onSearchDismiss;
+
+  /// Whether the Recently Deleted entry renders at the foot of the list. The
+  /// narrow layout turns this off and hosts [RecentlyDeletedFooter] in its
+  /// Scaffold's bottom slot instead, so the floating action button is spaced
+  /// above it rather than crowding the divider.
+  final bool showDeletedFooter;
 
   @override
   State<NoteList> createState() => _NoteListState();
@@ -148,8 +155,10 @@ class _NoteListState extends State<NoteList> {
         ),
         // Recently Deleted lives at the foot of the list — out of the way, and
         // only when there's something to recover and we're not searching.
-        if (controller.search.isEmpty && controller.deletedNotes.isNotEmpty)
-          _RecentlyDeletedFooter(count: controller.deletedNotes.length),
+        if (widget.showDeletedFooter &&
+            controller.search.isEmpty &&
+            controller.deletedNotes.isNotEmpty)
+          RecentlyDeletedFooter(count: controller.deletedNotes.length),
       ],
     );
   }
@@ -398,10 +407,11 @@ class _SwipeBackground extends StatelessWidget {
   }
 }
 
-/// Entry point to the Recently Deleted view, pinned below the list. Shown only
-/// when at least one note is soft-deleted.
-class _RecentlyDeletedFooter extends StatelessWidget {
-  const _RecentlyDeletedFooter({required this.count});
+/// Entry point to the Recently Deleted view, pinned below the list (sidebar)
+/// or in the Scaffold's bottom slot (narrow layout). Shown only when at least
+/// one note is soft-deleted.
+class RecentlyDeletedFooter extends StatelessWidget {
+  const RecentlyDeletedFooter({super.key, required this.count});
   final int count;
 
   @override
@@ -411,15 +421,19 @@ class _RecentlyDeletedFooter extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         const Divider(height: 0.5),
-        ListTile(
-          key: const Key('recently-deleted-entry'),
-          leading: Icon(Icons.delete_outline, color: theme.hintColor),
-          title: const Text('Recently Deleted'),
-          trailing: Text('$count', style: theme.textTheme.bodyMedium),
-          dense: true,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const RecentlyDeletedScreen(),
+        // Keep the row itself out of the home-indicator curve on iPhones.
+        SafeArea(
+          top: false,
+          child: ListTile(
+            key: const Key('recently-deleted-entry'),
+            leading: Icon(Icons.delete_outline, color: theme.hintColor),
+            title: const Text('Recently Deleted'),
+            trailing: Text('$count', style: theme.textTheme.bodyMedium),
+            dense: true,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const RecentlyDeletedScreen(),
+              ),
             ),
           ),
         ),
@@ -466,8 +480,8 @@ class _EmptyList extends StatelessWidget {
               Text('No notes yet', style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
               Text(
-                'Everything you write stays on this device, encrypted — '
-                'no account, no cloud.',
+                'Everything you write stays on this device, encrypted. '
+                'No account, no cloud.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium
                     ?.copyWith(color: theme.hintColor),
