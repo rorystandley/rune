@@ -39,6 +39,13 @@ ThemeData buildTheme(Brightness brightness) {
     snackBarTheme: const SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
     ),
+    // One accent for every create-note control. M3's default FAB colour is
+    // primaryContainer, which reads as a different (paler/darker) yellow than
+    // the filled "New note" button beside it — same action, two looks.
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: scheme.primary,
+      foregroundColor: scheme.onPrimary,
+    ),
     visualDensity: VisualDensity.adaptivePlatformDensity,
   );
 }
