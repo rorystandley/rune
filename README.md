@@ -10,6 +10,8 @@ trust anyone with your data, and neither should you.
 <p align="center">
   <a href="https://apps.apple.com/us/app/rune-secure-notes/id6786366361"><img alt="Download on the App Store" height="52" src="docs/assets/badge-app-store.svg"></a>
   &nbsp;&nbsp;
+  <a href="https://apps.apple.com/app/rune-secure-notes/id6786366361"><img alt="Download on the Mac App Store" height="52" src="docs/assets/badge-mac-app-store.svg"></a>
+  &nbsp;&nbsp;
   <a href="https://play.google.com/store/apps/details?id=co.rorystandley.rune"><img alt="Get it on Google Play" height="52" src="docs/assets/badge-google-play.png"></a>
 </p>
 
@@ -30,7 +32,8 @@ Rather talk than type? Dictate a note and both the recording *and* the
 transcription run entirely on your device, using whisper.cpp. Your voice never
 leaves the phone either.
 
-> **Where it's at, honestly.** Rune is live on both stores and does what it says,
+> **Where it's at, honestly.** Rune is live on the App Store, Mac App Store, and
+> Google Play, and does what it says,
 > but it's young and **not independently audited**. It leans on standard,
 > well-reviewed cryptographic primitives — it implements none of its own — and
 > the security-critical code is small and tested on every commit. If you're
