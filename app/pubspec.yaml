@@ -22,7 +22,7 @@ dependencies:
   # Stores the optional cached vault key in the platform credential store.
   flutter_secure_storage: ^10.3.1
   # Drives Face ID / Touch ID / Windows Hello availability checks and prompts.
-  local_auth: ^3.0.1
+  local_auth: ^3.0.2
   # Native share sheet for user-initiated single-note sharing. No network of
   # its own — it only hands text to the OS share UI.
   share_plus: ^13.2.0
