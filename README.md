@@ -5,7 +5,12 @@ encrypted on your phone with a passphrase only you know — no account, no cloud
 no sync, and not one network call. It feels like Apple Notes. It just doesn't
 trust anyone with your data, and neither should you.
 
-[![CI](https://github.com/rorystandley/rune/actions/workflows/ci.yml/badge.svg)](https://github.com/rorystandley/rune/actions/workflows/ci.yml)
+<p align="center">
+  <a href="https://github.com/rorystandley/rune/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/rorystandley/rune/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/rorystandley/rune/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/rorystandley/rune"></a>
+  <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/github/license/rorystandley/rune"></a>
+  <img alt="Platforms: iOS, Android, macOS, Windows, Linux" src="https://img.shields.io/badge/platforms-iOS%20%C2%B7%20Android%20%C2%B7%20macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-4c8dae">
+</p>
 
 <p align="center">
   <a href="https://apps.apple.com/us/app/rune-secure-notes/id6786366361"><img alt="Download on the App Store" height="52" src="docs/assets/badge-app-store.svg"></a>
