@@ -20,7 +20,12 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FLUTTER_VERSION: "3.44.2"
+  # Pinned Flutter SDK. F-Droid's build-flutter.yml recipe (srclib method) greps
+  # this file for the single-quoted version in the trailing comment below and
+  # checks out that Flutter tag, so its reproducible build matches our release.
+  # Both forms share one line so a version bump can't desync them. Keep the
+  # matchable form on this line only — no other line here may repeat it.
+  FLUTTER_VERSION: "3.44.2" # flutter-version: '3.44.2'
   # Pinned Android build input (NDK r28c) — matches flutter.ndkVersion,
   # RELEASE.md and docs/reproducibility.md.
   NDK_VERSION: "28.2.13676358"
