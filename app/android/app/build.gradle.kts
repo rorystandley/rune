@@ -1,3 +1,4 @@
+import com.android.build.gradle.internal.api.ApkVariantOutputImpl
 import java.io.FileInputStream
 import java.util.Properties
 
@@ -70,6 +71,10 @@ android {
             // must be re-verified against the double-build check (see RELEASE.md).
             isMinifyEnabled = false
             isShrinkResources = false
+            // F-Droid builds are not verified against a published binary, so they turn
+            // R8 on (the recipe uncomments the line) to strip the proprietary
+            // com.google.android.play.core classes that Flutter's embedding bundles.
+            //f isMinifyEnabled = true
             // Uses the upload keystore when android/key.properties exists; otherwise
             // falls back to debug signing so `flutter run --release` still works locally.
             signingConfig = if (keystorePropertiesFile.exists()) {
@@ -77,6 +82,21 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+        }
+    }
+}
+
+// Give each per-ABI split APK a distinct versionCode so stores (F-Droid) can offer
+// the right build per device. Only affects --split-per-abi builds; the universal
+// APK and the Play app bundle carry no ABI filter and are left untouched.
+val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86_64" to 3)
+android.applicationVariants.configureEach {
+    val variant = this
+    variant.outputs.forEach { output ->
+        val abiVersionCode = abiCodes[output.filters.find { it.filterType == "ABI" }?.identifier]
+        if (abiVersionCode != null) {
+            (output as ApkVariantOutputImpl).versionCodeOverride =
+                variant.versionCode * 10 + abiVersionCode
         }
     }
 }
