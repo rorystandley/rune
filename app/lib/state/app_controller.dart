@@ -27,11 +27,14 @@ class AppController extends ChangeNotifier {
     required this.recorder,
     BiometricUnlockStore? biometricUnlockStore,
     CryptoService? crypto,
-    VaultStore? store, // test seam: inject a store (e.g. one that fails writes)
+    // Test seam: inject a store (e.g. one that fails writes). Named distinctly
+    // from the `store` field so the field — not this nullable parameter — is
+    // what the constructor body below resolves `store` to.
+    VaultStore? initialStore,
     this.createKdfParams, // test seam: cheap params in tests, null = production
   }) : biometricUnlockStore =
            biometricUnlockStore ?? const DisabledBiometricUnlockStore(),
-       store = store ?? FileVaultStore(vaultDir) {
+       store = initialStore ?? FileVaultStore(vaultDir) {
     final c = crypto ?? CryptoService();
     vault = VaultService(store: store, crypto: c);
     repo = NotesRepository(vault: vault, store: store);

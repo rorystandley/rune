@@ -30,7 +30,7 @@ void main() {
       transcription: const StubTranscriptionService(),
       recorder: const UnavailableAudioRecorder(),
       biometricUnlockStore: biometricUnlockStore,
-      store: vaultStore,
+      initialStore: vaultStore,
       // Cheap KDF so tests are fast.
       createKdfParams: CryptoService().newKdfParams(
         memoryKiB: 256,
