@@ -5,6 +5,7 @@ import '../crypto/errors.dart';
 import '../crypto/kdf_params.dart';
 import '../models/vault_metadata.dart';
 import '../storage/vault_store.dart';
+import '../util/secure_bytes.dart';
 
 /// Owns the unlocked-vault runtime state: the in-memory data key (DEK) and the
 /// vault metadata. The DEK never leaves this object — callers encrypt/decrypt
@@ -153,9 +154,5 @@ class VaultService {
     return _cryptoFor(meta.cipher);
   }
 
-  void _zero(Uint8List bytes) {
-    for (var i = 0; i < bytes.length; i++) {
-      bytes[i] = 0;
-    }
-  }
+  void _zero(Uint8List bytes) => zeroBytes(bytes);
 }

@@ -21,3 +21,4 @@ export 'src/transcription/transcription_service.dart';
 export 'src/transcription/wav_decoder.dart';
 export 'src/transcription/whisper_transcription_service.dart';
 export 'src/util/redaction.dart';
+export 'src/util/secure_bytes.dart';

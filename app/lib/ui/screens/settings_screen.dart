@@ -128,7 +128,12 @@ class SettingsScreen extends StatelessWidget {
             subtitle: const Text(
               'Adds a backup\'s notes to this vault (keeps your current notes)',
             ),
-            onTap: () => _importBackup(context, controller),
+            // Disable while a slow operation (Argon2id, restore) is running so a
+            // second tap can't kick off a concurrent, duplicating import.
+            enabled: !controller.busy,
+            onTap: controller.busy
+                ? null
+                : () => _importBackup(context, controller),
           ),
           ListTile(
             leading: Icon(
@@ -139,7 +144,10 @@ class SettingsScreen extends StatelessWidget {
             subtitle: const Text(
               'Dangerous: erases this device\'s notes and restores the backup',
             ),
-            onTap: () => _restoreReplace(context, controller),
+            enabled: !controller.busy,
+            onTap: controller.busy
+                ? null
+                : () => _restoreReplace(context, controller),
           ),
           _section(context, 'About'),
           const ListTile(
@@ -288,9 +296,29 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
       );
-    } catch (_) {
+    } on FormatException {
+      // Validation fails before anything is deleted, so the current vault is
+      // untouched — it's safe to tell the user the file was the problem.
       messenger.showSnackBar(
         const SnackBar(content: Text('That file isn\'t a valid Rune backup.')),
+      );
+    } on UnsupportedVaultException {
+      // Also a validation failure (unknown cipher) — nothing was deleted.
+      messenger.showSnackBar(
+        const SnackBar(content: Text('That backup isn\'t supported by this app.')),
+      );
+    } catch (_) {
+      // A failure after validation means the old vault may already be gone and
+      // the restore incomplete. Send the user to the unlock/create screen and
+      // be honest that the vault state changed.
+      navigator.popUntil((r) => r.isFirst);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Restore didn\'t finish. Your previous notes may be gone — '
+            'try restoring the backup again.',
+          ),
+        ),
       );
     }
   }

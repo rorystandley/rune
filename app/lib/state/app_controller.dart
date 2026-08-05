@@ -395,28 +395,50 @@ class AppController extends ChangeNotifier {
     bool replaceExisting = false,
   }) async {
     _setBusy(true);
+    // The importer validates the whole backup *before* it deletes or writes
+    // anything, so the pre-write failures below leave storage untouched and the
+    // current session valid. Any other outcome — success, or a failure once
+    // writing has begun — means storage no longer matches the live session, so
+    // it must be reset.
+    var storageMayHaveChanged = false;
     try {
       final json = await file.readAsString();
-      final count = await importer.restoreAsNewVault(
-        json,
-        overwriteExisting: replaceExisting,
-      );
-      // The imported vault carries its own header and passphrase. Drop any
-      // current session and cached biometric key, then require a passphrase
-      // unlock against the newly written vault.
-      _autoLockTimer?.cancel();
-      _autoLockTimer = null;
-      repo.clear();
-      vault.lock();
-      _selectedId = null;
-      _search = '';
-      _unlockError = null;
-      await _disableBiometricUnlock(saveSettings: true);
-      await _refreshBiometricUnlockState(vaultExists: true, notify: false);
-      _phase = AppPhase.locked;
-      notifyListeners();
-      return count;
+      try {
+        final count = await importer.restoreAsNewVault(
+          json,
+          overwriteExisting: replaceExisting,
+        );
+        storageMayHaveChanged = true; // success: the vault was replaced
+        return count;
+      } on FormatException {
+        rethrow; // invalid backup, rejected during validation — nothing written
+      } on UnsupportedVaultException {
+        rethrow; // unknown cipher, rejected during validation — nothing written
+      } on VaultAlreadyExistsException {
+        rethrow; // refused before any delete/write — nothing changed
+      } catch (_) {
+        storageMayHaveChanged = true; // failed mid-write — storage is uncertain
+        rethrow;
+      }
     } finally {
+      // Drop the current session and cached biometric key, then set the phase
+      // from what is actually on disk. A fail-closed restore that never wrote
+      // its header leaves no vault, so we land back on the create/restore
+      // screen rather than showing notes that are gone.
+      if (storageMayHaveChanged) {
+        _autoLockTimer?.cancel();
+        _autoLockTimer = null;
+        repo.clear();
+        vault.lock();
+        _selectedId = null;
+        _search = '';
+        _unlockError = null;
+        await _disableBiometricUnlock(saveSettings: true);
+        final exists = await vault.vaultExists();
+        await _refreshBiometricUnlockState(vaultExists: exists, notify: false);
+        _phase = exists ? AppPhase.locked : AppPhase.needsCreation;
+        notifyListeners();
+      }
       _setBusy(false);
     }
   }
@@ -543,11 +565,7 @@ class AppController extends ChangeNotifier {
     ].join('|');
   }
 
-  void _zero(Uint8List bytes) {
-    for (var i = 0; i < bytes.length; i++) {
-      bytes[i] = 0;
-    }
-  }
+  void _zero(Uint8List bytes) => zeroBytes(bytes);
 
   String _stamp() =>
       DateTime.now().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');

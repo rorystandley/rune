@@ -355,6 +355,26 @@ void main() {
     expect(controller.visibleNotes, isEmpty);
   });
 
+  test('restoreFromBackup clears any cached biometric unlock', () async {
+    final biometrics = MemoryBiometricUnlockStore();
+    controller.dispose();
+    controller = await buildController(biometricUnlockStore: biometrics);
+
+    await controller.createVault('mine');
+    expect(await controller.enableBiometricUnlock(), isTrue);
+    expect(biometrics.hasCachedDek, isTrue);
+
+    // Replacing the vault invalidates the old DEK; the cache must be cleared so
+    // a stale key can't unlock the freshly restored vault.
+    final backup = await makeBackup(passphrase: 'fresh', notes: [('N', 'b')]);
+    await controller.restoreFromBackup(backup, replaceExisting: true);
+
+    expect(biometrics.hasCachedDek, isFalse);
+    expect(controller.settings.biometricUnlockEnabled, isFalse);
+    expect(controller.canUnlockWithBiometric, isFalse);
+    expect(controller.phase, AppPhase.locked);
+  });
+
   test('updateSettings rolls back and rethrows when the save fails', () async {
     final store = _ThrowingSettingsStore(File('${root.path}/settings.json'));
     controller.dispose();

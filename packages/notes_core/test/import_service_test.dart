@@ -143,6 +143,32 @@ void main() {
       await repo.loadAll();
       expect(repo.listNotes().single.body, 'fresh-body');
     });
+
+    test('an interrupted restore writes no openable vault (fails closed)',
+        () async {
+      final source = await vaultWith('p', [
+        ('a', '1'),
+        ('b', '2'),
+        ('c', '3'),
+      ]);
+      final backup = await exportOf(source);
+
+      final destDir = await Directory.systemTemp.createTemp('notes_failclosed_');
+      addTearDown(() => destDir.delete(recursive: true));
+      // Fail on the second blob write, part-way through the restore.
+      final failing =
+          _FailOnNthBlobStore(FileVaultStore(destDir), failOnWrite: 2);
+
+      await expectLater(
+        ImportService(store: failing)
+            .restoreAsNewVault(await backup.readAsString()),
+        throwsA(isA<_InjectedIoError>()),
+      );
+
+      // The header is written last, so a mid-restore failure leaves nothing a
+      // reader would recognise as a vault — no half-loaded, truncated note set.
+      expect(await FileVaultStore(destDir).vaultExists(), isFalse);
+    });
   });
 
   group('mergeIntoUnlockedVault', () {
@@ -263,6 +289,41 @@ void main() {
         throwsA(isA<DecryptionFailedException>()),
       );
     });
+
+    test('a tampered blob in a multi-note backup imports nothing', () async {
+      final source = await vaultWith('bp', [
+        ('One', '1'),
+        ('Two', '2'),
+        ('Three', '3'),
+      ]);
+      final backup = await exportOf(source);
+      final json =
+          jsonDecode(await backup.readAsString()) as Map<String, dynamic>;
+      final notes = json['notes'] as Map<String, dynamic>;
+      // Tamper the middle note, so the first is decrypted before the failure.
+      final id = notes.keys.elementAt(1);
+      final blob = base64.decode(notes[id] as String);
+      blob[blob.length ~/ 2] ^= 0xFF;
+      notes[id] = base64.encode(blob);
+
+      final dest = await vaultWith('dp', [('Mine', 'keep')]);
+      await expectLater(
+        dest.importer.mergeIntoUnlockedVault(
+          jsonEncode(json),
+          backupPassphrase: 'bp',
+          repository: dest.repo,
+        ),
+        throwsA(isA<DecryptionFailedException>()),
+      );
+
+      // Nothing was persisted: only the pre-existing note remains, both in
+      // memory and on disk.
+      expect(dest.repo.count, 1);
+      dest.vault.lock();
+      await dest.vault.unlock('dp');
+      await dest.repo.loadAll();
+      expect(dest.repo.listNotes().single.body, 'keep');
+    });
   });
 
   group('parse validation', () {
@@ -302,6 +363,46 @@ void main() {
       expect(() => importer.parse(bad), throwsA(isA<FormatException>()));
     });
   });
+}
+
+/// Marker exception injected by [_FailOnNthBlobStore] to simulate a write error
+/// (disk full, permissions) part-way through a restore.
+class _InjectedIoError implements Exception {
+  const _InjectedIoError();
+}
+
+/// Wraps a real [FileVaultStore] but throws on the Nth `writeNoteBlob`, to
+/// exercise a restore that is interrupted after some blobs are written.
+class _FailOnNthBlobStore implements VaultStore {
+  _FailOnNthBlobStore(this._inner, {required this.failOnWrite});
+
+  final FileVaultStore _inner;
+  final int failOnWrite;
+  int _writes = 0;
+
+  @override
+  Future<void> writeNoteBlob(String id, Uint8List blob) async {
+    _writes++;
+    if (_writes == failOnWrite) throw const _InjectedIoError();
+    return _inner.writeNoteBlob(id, blob);
+  }
+
+  @override
+  Future<bool> vaultExists() => _inner.vaultExists();
+  @override
+  Future<void> writeMetadata(VaultMetadata meta) => _inner.writeMetadata(meta);
+  @override
+  Future<VaultMetadata> readMetadata() => _inner.readMetadata();
+  @override
+  Future<List<String>> listNoteIds() => _inner.listNoteIds();
+  @override
+  Future<Uint8List> readNoteBlob(String id) => _inner.readNoteBlob(id);
+  @override
+  Future<void> deleteNoteBlob(String id) => _inner.deleteNoteBlob(id);
+  @override
+  Future<void> deleteEverything() => _inner.deleteEverything();
+  @override
+  String get description => _inner.description;
 }
 
 /// A syntactically valid vault header, for parser tests that never decrypt.

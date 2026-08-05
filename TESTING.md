@@ -86,7 +86,12 @@ Both are expected to report **no issues**.
 - A **wrong backup passphrase** on merge throws and imports nothing.
 - **Merge writes only ciphertext** — every file under the destination vault is
   scanned and asserted free of the plaintext.
-- A **tampered note blob** fails authentication (`DecryptionFailedException`).
+- A **tampered note blob** fails authentication (`DecryptionFailedException`),
+  and a tampered blob in a **multi-note** backup imports **nothing** — the
+  destination is unchanged in memory and on disk (merge decrypts all blobs
+  before persisting any).
+- An **interrupted restore fails closed:** a write error part-way through a
+  restore leaves no vault a reader would recognise (the header is written last).
 - Parser rejects non-JSON, the wrong format id, a future version, and unsafe
   note ids with a `FormatException`.
 
@@ -110,7 +115,9 @@ Both are expected to report **no issues**.
 - Encrypted backup export contains no plaintext.
 - Plaintext export requires confirmation.
 - **Restore** from a backup adopts it and locks for the backup's passphrase;
-  it refuses to overwrite an existing vault unless replacement is requested.
+  it refuses to overwrite an existing vault unless replacement is requested, and
+  a replace **clears any cached biometric unlock** so a stale key can't open the
+  restored vault.
 - **Import (merge)** adds a backup's notes to the current vault; a wrong backup
   passphrase is rejected and imports nothing.
 

@@ -56,10 +56,12 @@ class _CreateVaultScreenState extends State<CreateVaultScreen> {
     try {
       file = await pickBackupFile();
     } catch (_) {
+      if (!mounted) return;
       setState(() => _error = 'Could not open the file picker.');
       return;
     }
     if (file == null) return; // cancelled
+    if (!mounted) return;
     setState(() => _error = null);
     try {
       final count = await controller.restoreFromBackup(file);
@@ -75,6 +77,7 @@ class _CreateVaultScreenState extends State<CreateVaultScreen> {
       );
     } catch (_) {
       // Malformed file, unsupported version, or an unreadable pick.
+      if (!mounted) return;
       setState(
         () => _error = "That file isn't a valid Rune backup.",
       );

@@ -195,7 +195,14 @@ one Rune wrote. That input is treated as untrusted:
   JSON. (Broader fuzzing of the backup parser remains on the roadmap.)
 - **Replacing an existing vault is destructive and confirmed.** Restoring over a
   device that already has a vault erases the current notes; the UI requires an
-  explicit confirmation first, mirroring the plaintext-export gate.
+  explicit confirmation first, mirroring the plaintext-export gate. The restore
+  writes note blobs before the vault header (the file whose presence marks a
+  vault as existing), so an interrupted restore **fails closed** — it leaves no
+  half-loaded vault with a truncated note set, and the app returns to the
+  create/restore screen rather than showing notes that are gone. Restore is not
+  yet fully transactional (the previous vault is gone once deletion succeeds); a
+  staged-swap restore that keeps the old vault until the new one is complete is
+  noted as future hardening.
 
 ### Memory wiping — honest limitations
 

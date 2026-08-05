@@ -6,6 +6,7 @@ import '../crypto/errors.dart';
 import '../models/note.dart';
 import '../models/vault_metadata.dart';
 import '../storage/vault_store.dart';
+import '../util/secure_bytes.dart';
 import 'export_service.dart';
 import 'notes_repository.dart';
 
@@ -106,6 +107,15 @@ class ImportService {
   /// replacing a vault destroys whatever is currently stored, so callers must
   /// opt in explicitly (the UI confirms first). Returns the number of notes
   /// written.
+  ///
+  /// The backup is fully parsed and validated *before* anything is deleted, so
+  /// a malformed file never touches existing data. The note blobs are then
+  /// written *before* the vault header (the file whose presence marks a vault
+  /// as existing). That ordering makes an interrupted restore fail closed: a
+  /// crash or write error mid-restore leaves no readable vault at all, rather
+  /// than a vault whose header loads but whose notes are truncated. (Replacing
+  /// still isn't transactional — the previous vault is gone once deletion
+  /// succeeds; staged-swap restore is noted as future hardening in SECURITY.md.)
   Future<int> restoreAsNewVault(
     String jsonString, {
     bool overwriteExisting = false,
@@ -117,10 +127,12 @@ class ImportService {
     if (overwriteExisting) {
       await store.deleteEverything();
     }
-    await store.writeMetadata(bundle.vault);
     for (final entry in bundle.notes.entries) {
       await store.writeNoteBlob(entry.key, entry.value);
     }
+    // Header last: only now does the vault "exist", and by then every blob is
+    // already on disk.
+    await store.writeMetadata(bundle.vault);
     return bundle.notes.length;
   }
 
@@ -131,9 +143,11 @@ class ImportService {
   /// Each note is decrypted with the backup's key in memory, given a fresh id,
   /// and re-sealed under the current vault's key — so existing notes are never
   /// touched and duplicates simply coexist. Throws [WrongPassphraseException]
-  /// if [backupPassphrase] is wrong (nothing is imported), and
-  /// [DecryptionFailedException] if a note blob fails authentication. Returns
-  /// the number of notes imported.
+  /// if [backupPassphrase] is wrong, and [DecryptionFailedException] if any note
+  /// blob fails authentication. In both failure cases **nothing is imported**:
+  /// every blob is decrypted first, and notes are persisted only once all of
+  /// them succeed, so a tampered blob part-way through can't leave a partial
+  /// import behind. Returns the number of notes imported.
   Future<int> mergeIntoUnlockedVault(
     String jsonString, {
     required String backupPassphrase,
@@ -146,24 +160,23 @@ class ImportService {
     try {
       // A wrong passphrase fails here, before anything is imported.
       backupDek = await crypto.unwrapDek(bundle.vault.wrappedKey, kek);
-      _zero(kek);
-      var imported = 0;
+      zeroBytes(kek);
+      // Decrypt everything up front: a blob that fails authentication must
+      // abort the whole import, not leave a partial one behind. The ciphertext
+      // is already fully in memory, so this adds no meaningful cost.
+      final decoded = <Note>[];
       for (final blob in bundle.notes.values) {
         final plaintext =
             await crypto.open(blob, backupDek, label: 'imported note');
-        await repository.addImportedNote(Note.fromEncodedBytes(plaintext));
-        imported++;
+        decoded.add(Note.fromEncodedBytes(plaintext));
       }
-      return imported;
+      for (final note in decoded) {
+        await repository.addImportedNote(note);
+      }
+      return decoded.length;
     } finally {
-      _zero(kek);
-      if (backupDek != null) _zero(backupDek);
-    }
-  }
-
-  void _zero(Uint8List bytes) {
-    for (var i = 0; i < bytes.length; i++) {
-      bytes[i] = 0;
+      zeroBytes(kek);
+      if (backupDek != null) zeroBytes(backupDek);
     }
   }
 }

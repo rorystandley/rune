@@ -7,6 +7,7 @@ All notable changes to Rune are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+
 - **Encrypted-backup import & restore.** The `.notesbak` bundles Rune already
   exports can now be read back in, closing the loop on moving to a new device.
   - *Restore* (offered on the first-run screen when there is no vault yet)
