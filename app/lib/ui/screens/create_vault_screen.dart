@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
+import '../../platform/backup_file_picker.dart';
 import '../../state/app_scope.dart';
 import '../widgets/passphrase_strength_meter.dart';
 
@@ -44,6 +47,38 @@ class _CreateVaultScreenState extends State<CreateVaultScreen> {
     }
     setState(() => _error = null);
     await AppScope.of(context).createVault(pass);
+  }
+
+  Future<void> _restoreFromBackup() async {
+    final controller = AppScope.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    File? file;
+    try {
+      file = await pickBackupFile();
+    } catch (_) {
+      setState(() => _error = 'Could not open the file picker.');
+      return;
+    }
+    if (file == null) return; // cancelled
+    setState(() => _error = null);
+    try {
+      final count = await controller.restoreFromBackup(file);
+      // On success the app flips to the locked phase and routes to the unlock
+      // screen; leave a hint about which passphrase to use.
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Restored $count note${count == 1 ? '' : 's'}. '
+            'Unlock with your backup passphrase.',
+          ),
+        ),
+      );
+    } catch (_) {
+      // Malformed file, unsupported version, or an unreadable pick.
+      setState(
+        () => _error = "That file isn't a valid Rune backup.",
+      );
+    }
   }
 
   @override
@@ -128,7 +163,14 @@ class _CreateVaultScreenState extends State<CreateVaultScreen> {
                         : const Text('Create vault'),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  key: const Key('restore-backup-button'),
+                  onPressed: controller.busy ? null : _restoreFromBackup,
+                  icon: const Icon(Icons.restore, size: 18),
+                  label: const Text('Restore from a backup'),
+                ),
+                const SizedBox(height: 8),
                 Text(
                   'Stored locally at:\n${controller.vaultLocation}',
                   textAlign: TextAlign.center,

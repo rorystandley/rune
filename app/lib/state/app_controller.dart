@@ -35,6 +35,7 @@ class AppController extends ChangeNotifier {
     vault = VaultService(store: store, crypto: c);
     repo = NotesRepository(vault: vault, store: store);
     exporter = ExportService(store: store);
+    importer = ImportService(store: store);
   }
 
   final Directory vaultDir;
@@ -52,6 +53,7 @@ class AppController extends ChangeNotifier {
   late final VaultService vault;
   late final NotesRepository repo;
   late final ExportService exporter;
+  late final ImportService importer;
 
   AppPhase _phase = AppPhase.loading;
   AppSettings _settings = const AppSettings();
@@ -375,6 +377,71 @@ class AppController extends ChangeNotifier {
   Future<Directory> exportPlaintext({required bool confirmed}) async {
     final target = Directory('${exportsDir.path}/notes-plaintext-${_stamp()}');
     return exporter.exportPlaintext(target, repo, confirmed: confirmed);
+  }
+
+  // --------------------------------------------------------------- import ---
+
+  /// Restores an encrypted backup as this device's vault — the fresh-device
+  /// path. Copies the backup's (already encrypted) header and note blobs to
+  /// storage without decrypting anything, then leaves the app **locked** so the
+  /// user unlocks with the backup's passphrase.
+  ///
+  /// Refuses to overwrite an existing vault unless [replaceExisting] is set;
+  /// replacing is destructive, so the UI confirms first. Returns the number of
+  /// notes restored. Propagates [VaultAlreadyExistsException] and
+  /// [FormatException] for the UI to surface.
+  Future<int> restoreFromBackup(
+    File file, {
+    bool replaceExisting = false,
+  }) async {
+    _setBusy(true);
+    try {
+      final json = await file.readAsString();
+      final count = await importer.restoreAsNewVault(
+        json,
+        overwriteExisting: replaceExisting,
+      );
+      // The imported vault carries its own header and passphrase. Drop any
+      // current session and cached biometric key, then require a passphrase
+      // unlock against the newly written vault.
+      _autoLockTimer?.cancel();
+      _autoLockTimer = null;
+      repo.clear();
+      vault.lock();
+      _selectedId = null;
+      _search = '';
+      _unlockError = null;
+      await _disableBiometricUnlock(saveSettings: true);
+      await _refreshBiometricUnlockState(vaultExists: true, notify: false);
+      _phase = AppPhase.locked;
+      notifyListeners();
+      return count;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  /// Merges an encrypted backup's notes into the current, already-unlocked
+  /// vault. Needs the passphrase the backup was made with. Each note is
+  /// decrypted in memory and re-sealed under this vault's key with a fresh id,
+  /// so nothing existing is overwritten. Returns the number of notes imported.
+  ///
+  /// Propagates [WrongPassphraseException] (nothing is imported) and
+  /// [FormatException] for the UI to surface.
+  Future<int> importFromBackup(File file, String backupPassphrase) async {
+    _setBusy(true);
+    try {
+      final json = await file.readAsString();
+      final count = await importer.mergeIntoUnlockedVault(
+        json,
+        backupPassphrase: backupPassphrase,
+        repository: repo,
+      );
+      notifyListeners(); // surface the newly imported notes
+      return count;
+    } finally {
+      _setBusy(false);
+    }
   }
 
   // ------------------------------------------------------------ auto-lock ---

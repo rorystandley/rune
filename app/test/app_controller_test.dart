@@ -255,6 +255,106 @@ void main() {
     );
   });
 
+  // Writes a real .notesbak from a throwaway source vault, for the import and
+  // restore tests below.
+  Future<File> makeBackup({
+    required String passphrase,
+    required List<(String, String)> notes,
+  }) async {
+    final dir = await Directory.systemTemp.createTemp('notes_src_');
+    addTearDown(() async {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    });
+    final store = FileVaultStore(dir);
+    final vault = VaultService(store: store);
+    await vault.createVault(
+      passphrase,
+      kdfParams: CryptoService().newKdfParams(
+        memoryKiB: 256,
+        iterations: 1,
+        parallelism: 1,
+      ),
+    );
+    final repo = NotesRepository(vault: vault, store: store);
+    await repo.loadAll();
+    for (final (title, body) in notes) {
+      await repo.createNote(title: title, body: body);
+    }
+    final out = File('${dir.path}/backup.notesbak');
+    await ExportService(store: store).exportEncryptedBackup(out);
+    return out;
+  }
+
+  test('restoreFromBackup adopts the backup and locks for its passphrase',
+      () async {
+    final backup =
+        await makeBackup(passphrase: 'old-phone', notes: [('Groceries', 'milk')]);
+
+    final count = await controller.restoreFromBackup(backup);
+    expect(count, 1);
+    // Fresh-device path: the app is now locked on the restored vault.
+    expect(controller.phase, AppPhase.locked);
+
+    expect(await controller.unlock('old-phone'), isTrue);
+    expect(controller.visibleNotes.single.body, 'milk');
+  });
+
+  test('restoreFromBackup refuses to overwrite an existing vault', () async {
+    await controller.createVault('mine');
+    final backup = await makeBackup(passphrase: 'other', notes: [('X', 'y')]);
+    await expectLater(
+      controller.restoreFromBackup(backup),
+      throwsA(isA<VaultAlreadyExistsException>()),
+    );
+  });
+
+  test('restoreFromBackup replaceExisting swaps in the backup vault', () async {
+    await controller.createVault('mine');
+    final stale = await controller.newNote();
+    await controller.saveNote(stale.id, title: 'Mine', body: 'stale');
+
+    final backup = await makeBackup(
+      passphrase: 'fresh-pass',
+      notes: [('Fresh', 'fresh-body')],
+    );
+    final count =
+        await controller.restoreFromBackup(backup, replaceExisting: true);
+    expect(count, 1);
+    expect(controller.phase, AppPhase.locked);
+
+    // The old passphrase is gone; the backup's opens the restored notes.
+    expect(await controller.unlock('mine'), isFalse);
+    expect(await controller.unlock('fresh-pass'), isTrue);
+    expect(controller.visibleNotes.single.body, 'fresh-body');
+  });
+
+  test('importFromBackup merges a backup into the current vault', () async {
+    await controller.createVault('dest-pass');
+    final mine = await controller.newNote();
+    await controller.saveNote(mine.id, title: 'Mine', body: 'keep');
+
+    final backup = await makeBackup(
+      passphrase: 'src-pass',
+      notes: [('Imported', 'from-backup'), ('Two', '2')],
+    );
+    final count = await controller.importFromBackup(backup, 'src-pass');
+    expect(count, 2);
+    expect(
+      controller.visibleNotes.map((n) => n.body).toSet(),
+      {'keep', 'from-backup', '2'},
+    );
+  });
+
+  test('importFromBackup rejects a wrong backup passphrase', () async {
+    await controller.createVault('dest-pass');
+    final backup = await makeBackup(passphrase: 'src-pass', notes: [('X', 'y')]);
+    await expectLater(
+      controller.importFromBackup(backup, 'WRONG'),
+      throwsA(isA<WrongPassphraseException>()),
+    );
+    expect(controller.visibleNotes, isEmpty);
+  });
+
   test('updateSettings rolls back and rethrows when the save fails', () async {
     final store = _ThrowingSettingsStore(File('${root.path}/settings.json'));
     controller.dispose();

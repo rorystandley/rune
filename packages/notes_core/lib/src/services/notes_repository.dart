@@ -94,6 +94,25 @@ class NotesRepository {
     return note;
   }
 
+  /// Adds a note that came from an imported backup. Mints a *fresh* id — so it
+  /// can never collide with an existing note — but preserves the source note's
+  /// title, body, timestamps, pin state, and soft-deleted state. Encrypts and
+  /// persists immediately under this vault's key. Returns the stored note.
+  Future<Note> addImportedNote(Note source) async {
+    final imported = Note(
+      id: _newId(),
+      title: source.title,
+      body: source.body,
+      createdAt: source.createdAt,
+      updatedAt: source.updatedAt,
+      pinned: source.pinned,
+      deletedAt: source.deletedAt,
+    );
+    await _persist(imported);
+    _notes[imported.id] = imported;
+    return imported;
+  }
+
   Future<Note> updateNote(String id, {String? title, String? body}) async {
     final existing = getNote(id);
     if (existing == null) {

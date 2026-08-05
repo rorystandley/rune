@@ -60,8 +60,9 @@ leaves the phone either.
   No upload, no third-party speech API.
 - **Familiar and fast.** Two-pane on desktop, single-pane on mobile, with instant
   local search. If you've used Apple Notes, you already know how to use Rune.
-- **Your data stays yours.** Encrypted backups you hold the key to, plus a
-  deliberately guarded plaintext export for when you really want one.
+- **Your data stays yours.** Encrypted backups you hold the key to — export
+  them, then restore or import them onto a new device — plus a deliberately
+  guarded plaintext export for when you really want one.
 - **Runs everywhere.** One codebase for iOS, Android, macOS, Windows, and Linux.
 - **Open and checkable.** GPLv3, reproducible Android builds, and releases signed
   with cryptographic provenance anyone can verify.
@@ -238,6 +239,10 @@ security tests pass publicly on each commit (see the CI badge above).
 - A wrong passphrase cannot decrypt (test-proven).
 - Notes: create, edit (autosave), delete, list, local search.
 - Encrypted backup export; plaintext export gated behind explicit confirmation.
+- Encrypted-backup import & restore: restore a backup onto a fresh device
+  (ciphertext copied verbatim, unlocked with the backup's passphrase) or merge
+  one into an existing vault (re-sealed under the current key). Replacing an
+  existing vault is gated behind explicit confirmation.
 - Settings screen with the privacy posture, auto-lock, and change-passphrase.
 - Responsive Apple-Notes-style UI (two-pane desktop, single-pane mobile).
 - Voice-note flow: record locally → transcribe on-device → insert into a note →

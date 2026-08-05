@@ -172,6 +172,31 @@ random 128-bit ids, not derived from content.
   clipboard. (File *paths* shown after export are user-selectable text, which the
   user may copy deliberately.)
 
+### Importing a backup — the trust boundary
+
+Restoring or importing reads a `.notesbak` file the user chose, which may not be
+one Rune wrote. That input is treated as untrusted:
+
+- **Restore copies ciphertext only.** Restoring onto a fresh device writes the
+  backup's encrypted header and note blobs to storage without decrypting
+  anything — the "only ciphertext on disk" invariant holds unchanged, and the
+  backup's passphrase is needed only for the subsequent unlock.
+- **Import decrypts in memory, re-seals before writing.** Merging into an
+  existing vault decrypts each note with the backup's passphrase in memory,
+  then re-encrypts it under the current vault's key before it touches disk. A
+  test scans the destination vault and asserts no plaintext leaks. A wrong
+  passphrase fails at the wrapped-key check and imports nothing; a tampered note
+  blob fails its authentication tag (`DecryptionFailedException`).
+- **The parser is defensive.** A malformed file, an unsupported version, or a
+  crafted note id is rejected with a `FormatException` before anything is
+  written; note ids are validated against the same conservative pattern the
+  on-disk store enforces, so a backup can't smuggle a path that escapes the
+  notes directory. Integrity of note content rests on the AEAD tag, not the
+  JSON. (Broader fuzzing of the backup parser remains on the roadmap.)
+- **Replacing an existing vault is destructive and confirmed.** Restoring over a
+  device that already has a vault erases the current notes; the UI requires an
+  explicit confirmation first, mirroring the plaintext-export gate.
+
 ### Memory wiping — honest limitations
 
 On lock and after key use, byte buffers holding the KEK/DEK are explicitly

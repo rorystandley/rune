@@ -41,7 +41,13 @@ honestly private" to "would survive scrutiny on r/privacy".
 
 8. **Native file picker / share sheet for exports** (`file_picker`,
    `share_plus`) so users choose where backups go, plus **encrypted-backup
-   import/restore** (the backup format already carries everything needed).
+   import/restore**. Import/restore is implemented: a backup can be restored
+   onto a fresh device (its encrypted header and note blobs are copied verbatim,
+   then unlocked with the backup's passphrase) or merged into an existing
+   unlocked vault (decrypted with the backup's passphrase in memory and
+   re-sealed under the current key with fresh ids), and the backup is chosen
+   with the native `file_picker`. Choosing where *exports* are written still
+   uses the documented path rather than a save dialog.
 
 9. **Optional end-to-end encrypted sync**, off by default, zero-knowledge
    (server stores only ciphertext + wrapped keys). This is where most "private"
