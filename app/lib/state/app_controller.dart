@@ -27,10 +27,11 @@ class AppController extends ChangeNotifier {
     required this.recorder,
     BiometricUnlockStore? biometricUnlockStore,
     CryptoService? crypto,
+    VaultStore? store, // test seam: inject a store (e.g. one that fails writes)
     this.createKdfParams, // test seam: cheap params in tests, null = production
   }) : biometricUnlockStore =
            biometricUnlockStore ?? const DisabledBiometricUnlockStore(),
-       store = FileVaultStore(vaultDir) {
+       store = store ?? FileVaultStore(vaultDir) {
     final c = crypto ?? CryptoService();
     vault = VaultService(store: store, crypto: c);
     repo = NotesRepository(vault: vault, store: store);
@@ -49,7 +50,7 @@ class AppController extends ChangeNotifier {
   final BiometricUnlockStore biometricUnlockStore;
   final KdfParams? createKdfParams;
 
-  late final FileVaultStore store;
+  late final VaultStore store;
   late final VaultService vault;
   late final NotesRepository repo;
   late final ExportService exporter;
@@ -433,6 +434,7 @@ class AppController extends ChangeNotifier {
         _selectedId = null;
         _search = '';
         _unlockError = null;
+        _biometricUnlockError = null;
         await _disableBiometricUnlock(saveSettings: true);
         final exists = await vault.vaultExists();
         await _refreshBiometricUnlockState(vaultExists: exists, notify: false);
@@ -448,10 +450,18 @@ class AppController extends ChangeNotifier {
   /// decrypted in memory and re-sealed under this vault's key with a fresh id,
   /// so nothing existing is overwritten. Returns the number of notes imported.
   ///
-  /// Propagates [WrongPassphraseException] (nothing is imported) and
-  /// [FormatException] for the UI to surface.
+  /// Propagates [WrongPassphraseException] (nothing is imported),
+  /// [DecryptionFailedException] (a tampered blob), and [FormatException] for
+  /// the UI to surface.
   Future<int> importFromBackup(File file, String backupPassphrase) async {
     _setBusy(true);
+    // A large import plus Argon2id (with the backup's own cost parameters) can
+    // outlast the auto-lock interval. If the timer fired mid-import it would
+    // lock the vault and zero the DEK, aborting the persist loop partway and
+    // breaking the atomicity merge otherwise guarantees — so suspend it for the
+    // duration and restart it when we're done.
+    _autoLockTimer?.cancel();
+    _autoLockTimer = null;
     try {
       final json = await file.readAsString();
       final count = await importer.mergeIntoUnlockedVault(
@@ -462,6 +472,7 @@ class AppController extends ChangeNotifier {
       notifyListeners(); // surface the newly imported notes
       return count;
     } finally {
+      _resetAutoLock();
       _setBusy(false);
     }
   }

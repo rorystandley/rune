@@ -362,6 +362,51 @@ void main() {
       });
       expect(() => importer.parse(bad), throwsA(isA<FormatException>()));
     });
+
+    test('a non-string note value is rejected', () {
+      final bad = jsonEncode({
+        'format': ExportService.backupFormat,
+        'version': ExportService.backupVersion,
+        'vault': _dummyVaultHeader(),
+        'notes': {'abcdef': 42},
+      });
+      expect(() => importer.parse(bad), throwsA(isA<FormatException>()));
+    });
+
+    test('a missing vault header is rejected', () {
+      final bad = jsonEncode({
+        'format': ExportService.backupFormat,
+        'version': ExportService.backupVersion,
+        'notes': <String, String>{},
+      });
+      expect(() => importer.parse(bad), throwsA(isA<FormatException>()));
+    });
+
+    test('an abusive Argon2id memory cost is rejected', () {
+      final header = _dummyVaultHeader();
+      (header['kdf'] as Map<String, dynamic>)['memoryKiB'] =
+          KdfParams.maxMemoryKiB + 1;
+      final bad = jsonEncode({
+        'format': ExportService.backupFormat,
+        'version': ExportService.backupVersion,
+        'vault': header,
+        'notes': <String, String>{},
+      });
+      expect(() => importer.parse(bad), throwsA(isA<FormatException>()));
+    });
+
+    test('an abusive Argon2id iteration count is rejected', () {
+      final header = _dummyVaultHeader();
+      (header['kdf'] as Map<String, dynamic>)['iterations'] =
+          KdfParams.maxIterations + 1;
+      final bad = jsonEncode({
+        'format': ExportService.backupFormat,
+        'version': ExportService.backupVersion,
+        'vault': header,
+        'notes': <String, String>{},
+      });
+      expect(() => importer.parse(bad), throwsA(isA<FormatException>()));
+    });
   });
 }
 

@@ -36,6 +36,32 @@ class KdfParams {
   static const int defaultParallelism = 1;
   static const int saltLength = 16;
 
+  /// Upper bounds on the cost parameters, used to reject abusive values that
+  /// arrive in an *untrusted* header (e.g. an imported backup). Without a cap, a
+  /// crafted `memoryKiB` of, say, 64 GiB would make Argon2id try to allocate
+  /// that much and take the app down when the header is used to derive a key.
+  /// The ceilings sit far above any sane production setting (default is 64 MiB /
+  /// 3 passes) so they never reject a legitimately-configured vault.
+  static const int maxMemoryKiB = 1 << 20; // 1 GiB
+  static const int maxIterations = 4096;
+  static const int maxParallelism = 255;
+
+  /// Throws [FormatException] if any cost parameter is out of the supported
+  /// range. Call this on parameters parsed from untrusted input before handing
+  /// them to the KDF. Bounds are inclusive.
+  void validateCost() {
+    if (memoryKiB < 8 || memoryKiB > maxMemoryKiB) {
+      throw FormatException(
+          'Argon2id memory cost out of range: $memoryKiB KiB');
+    }
+    if (iterations < 1 || iterations > maxIterations) {
+      throw FormatException('Argon2id iterations out of range: $iterations');
+    }
+    if (parallelism < 1 || parallelism > maxParallelism) {
+      throw FormatException('Argon2id parallelism out of range: $parallelism');
+    }
+  }
+
   Map<String, dynamic> toJson() => {
         'algorithm': 'argon2id',
         'memoryKiB': memoryKiB,

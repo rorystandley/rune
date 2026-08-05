@@ -75,6 +75,10 @@ class ImportService {
       throw const FormatException('Backup is missing its vault header');
     }
     final meta = VaultMetadata.fromJson(vaultJson);
+    // The header is untrusted: reject abusive Argon2id costs before they can
+    // reach the KDF (a huge memoryKiB would otherwise try to allocate gigabytes
+    // when the backup is unlocked or merged).
+    meta.kdfParams.validateCost();
 
     final notesJson = decoded['notes'];
     if (notesJson is! Map<String, dynamic>) {

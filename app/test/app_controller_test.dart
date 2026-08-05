@@ -15,19 +15,22 @@ void main() {
   Future<AppController> buildController({
     BiometricUnlockStore? biometricUnlockStore,
     SettingsStore? settingsStore,
+    VaultStore? vaultStore,
+    int autoLockMinutes = 0,
   }) async {
-    final store =
+    final settings =
         settingsStore ?? SettingsStore(File('${root.path}/settings.json'));
-    // Disable auto-lock in tests so no Timer is left pending.
-    await store.save(const AppSettings(autoLockMinutes: 0));
+    // Auto-lock defaults off in tests so no Timer is left pending.
+    await settings.save(AppSettings(autoLockMinutes: autoLockMinutes));
     final c = AppController(
       vaultDir: Directory('${root.path}/vault'),
       audioTempDir: Directory('${root.path}/audio'),
       exportsDir: Directory('${root.path}/exports'),
-      settingsStore: store,
+      settingsStore: settings,
       transcription: const StubTranscriptionService(),
       recorder: const UnavailableAudioRecorder(),
       biometricUnlockStore: biometricUnlockStore,
+      store: vaultStore,
       // Cheap KDF so tests are fast.
       createKdfParams: CryptoService().newKdfParams(
         memoryKiB: 256,
@@ -306,6 +309,61 @@ void main() {
       controller.restoreFromBackup(backup),
       throwsA(isA<VaultAlreadyExistsException>()),
     );
+    // Refused before any delete or write: the session and vault are intact.
+    expect(controller.phase, AppPhase.unlocked);
+    expect(await controller.vault.vaultExists(), isTrue);
+  });
+
+  test('a restore that fails mid-write ends fail-closed in needsCreation',
+      () async {
+    final biometrics = MemoryBiometricUnlockStore();
+    controller.dispose();
+    final failing =
+        _ArmableFailingStore(FileVaultStore(Directory('${root.path}/vault')));
+    controller = await buildController(
+      biometricUnlockStore: biometrics,
+      vaultStore: failing,
+    );
+
+    await controller.createVault('mine');
+    final n = await controller.newNote();
+    await controller.saveNote(n.id, title: 'Mine', body: 'keep');
+    expect(await controller.enableBiometricUnlock(), isTrue);
+    expect(biometrics.hasCachedDek, isTrue);
+
+    final backup = await makeBackup(
+      passphrase: 'fresh',
+      notes: [('A', '1'), ('B', '2'), ('C', '3')],
+    );
+
+    // Writes fail from here: the replace deletes the old vault, then the first
+    // blob write throws before the header is written.
+    failing.failWrites = true;
+    await expectLater(
+      controller.restoreFromBackup(backup, replaceExisting: true),
+      throwsA(isA<Exception>()),
+    );
+
+    // Fail-closed: no header was written, so there is no vault; the session is
+    // dropped and the cached biometric key is cleared.
+    expect(controller.phase, AppPhase.needsCreation);
+    expect(controller.visibleNotes, isEmpty);
+    expect(biometrics.hasCachedDek, isFalse);
+    expect(controller.canUnlockWithBiometric, isFalse);
+  });
+
+  test('import suspends auto-lock and leaves the vault unlocked', () async {
+    controller.dispose();
+    controller = await buildController(autoLockMinutes: 1);
+    await controller.createVault('dest-pass');
+    final backup = await makeBackup(passphrase: 'src', notes: [('A', '1')]);
+
+    final count = await controller.importFromBackup(backup, 'src');
+    expect(count, 1);
+    // The import ran to completion without the auto-lock timer locking the
+    // vault mid-way; it stays unlocked with the imported note present.
+    expect(controller.phase, AppPhase.unlocked);
+    expect(controller.visibleNotes.length, 1);
   });
 
   test('restoreFromBackup replaceExisting swaps in the backup vault', () async {
@@ -393,6 +451,44 @@ void main() {
     );
     expect(controller.settings.autoLockMinutes, before); // rolled back
   });
+}
+
+/// Marker exception injected by [_ArmableFailingStore].
+class _InjectedWriteError implements Exception {
+  const _InjectedWriteError();
+}
+
+/// Wraps a real [VaultStore] but, once [failWrites] is armed, throws on every
+/// `writeNoteBlob`. Lets a controller test drive a restore that fails partway
+/// through writing, exercising the fail-closed reset path.
+class _ArmableFailingStore implements VaultStore {
+  _ArmableFailingStore(this._inner);
+
+  final VaultStore _inner;
+  bool failWrites = false;
+
+  @override
+  Future<void> writeNoteBlob(String id, Uint8List blob) async {
+    if (failWrites) throw const _InjectedWriteError();
+    return _inner.writeNoteBlob(id, blob);
+  }
+
+  @override
+  Future<bool> vaultExists() => _inner.vaultExists();
+  @override
+  Future<void> writeMetadata(VaultMetadata meta) => _inner.writeMetadata(meta);
+  @override
+  Future<VaultMetadata> readMetadata() => _inner.readMetadata();
+  @override
+  Future<List<String>> listNoteIds() => _inner.listNoteIds();
+  @override
+  Future<Uint8List> readNoteBlob(String id) => _inner.readNoteBlob(id);
+  @override
+  Future<void> deleteNoteBlob(String id) => _inner.deleteNoteBlob(id);
+  @override
+  Future<void> deleteEverything() => _inner.deleteEverything();
+  @override
+  String get description => _inner.description;
 }
 
 /// A [SettingsStore] whose [save] can be made to fail on demand, to exercise

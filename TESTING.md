@@ -116,8 +116,8 @@ Both are expected to report **no issues**.
 - Plaintext export requires confirmation.
 - **Restore** from a backup adopts it and locks for the backup's passphrase;
   it refuses to overwrite an existing vault unless replacement is requested, and
-  a replace **clears any cached biometric unlock** so a stale key can't open the
-  restored vault.
+  a replacement **clears any cached biometric unlock** so a stale key can't open
+  the restored vault.
 - **Import (merge)** adds a backup's notes to the current vault; a wrong backup
   passphrase is rejected and imports nothing.
 

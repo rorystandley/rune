@@ -252,6 +252,15 @@ class SettingsScreen extends StatelessWidget {
       if (context.mounted) {
         _snack(context, 'Incorrect passphrase for that backup.');
       }
+    } on DecryptionFailedException {
+      // The passphrase was right, so a note blob failed authentication: the
+      // backup has been altered in storage or transit. Nothing was imported.
+      if (context.mounted) {
+        _snack(
+          context,
+          'That backup failed its integrity check and was not imported.',
+        );
+      }
     } catch (_) {
       if (context.mounted) {
         _snack(context, 'That file isn\'t a valid Rune backup.');

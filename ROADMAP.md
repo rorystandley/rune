@@ -39,15 +39,16 @@ honestly private" to "would survive scrutiny on r/privacy".
    a physical Android device (Galaxy A53), and a physical iPhone. Windows/Linux
    keep the stub by design. See `docs/transcription.md`.
 
-8. **Native file picker / share sheet for exports** (`file_selector`,
-   `share_plus`) so users choose where backups go, plus **encrypted-backup
-   import/restore**. Import/restore is implemented: a backup can be restored
-   onto a fresh device (its encrypted header and note blobs are copied verbatim,
-   then unlocked with the backup's passphrase) or merged into an existing
-   unlocked vault (decrypted with the backup's passphrase in memory and
-   re-sealed under the current key with fresh ids), and the backup is chosen
-   with the native file picker (`file_selector`). Choosing where *exports* are
-   written still uses the documented path rather than a save dialog.
+8. **Native file picker for exports** (`file_selector`) so users choose where
+   backups are written, plus **encrypted-backup import/restore**. Import/restore
+   is implemented: a backup can be restored onto a fresh device (its encrypted
+   header and note blobs are copied verbatim, then unlocked with the backup's
+   passphrase) or merged into an existing unlocked vault (decrypted with the
+   backup's passphrase in memory and re-sealed under the current key with fresh
+   ids), and the backup is chosen with the native file picker (`file_selector`).
+   Choosing where *exports* are written still uses the documented path rather
+   than a save dialog. (The share sheet for single-note export shipped
+   separately — see UX item 9 below.)
 
 9. **Optional end-to-end encrypted sync**, off by default, zero-knowledge
    (server stores only ciphertext + wrapped keys). This is where most "private"
