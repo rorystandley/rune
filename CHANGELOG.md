@@ -20,7 +20,7 @@ All notable changes to Rune are documented here. The format is based on
     already on the device is overwritten.
   - A separate, explicitly confirmed *Restore (replace this vault)* action
     covers replacing the notes on a device that already has a vault.
-  - Backups are chosen with the native file picker (`file_picker`). Malformed
+  - Backups are chosen with the native file picker (`file_selector`). Malformed
     files, unsupported versions, and wrong passphrases fail safely with a clear
     message and never write plaintext to disk — all proven by new tests.
 
