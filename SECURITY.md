@@ -191,8 +191,16 @@ one Rune wrote. That input is treated as untrusted:
   crafted note id is rejected with a `FormatException` before anything is
   written; note ids are validated against the same conservative pattern the
   on-disk store enforces, so a backup can't smuggle a path that escapes the
-  notes directory. Integrity of note content rests on the AEAD tag, not the
-  JSON. (Broader fuzzing of the backup parser remains on the roadmap.)
+  notes directory. The Argon2id cost parameters in the header are bounded
+  (memory, iterations, parallelism, and their combined work) and rejected if
+  abusive — enforced both at import and inside the KDF — so a crafted header
+  can't exhaust memory or hang unlock/import. Integrity of note content rests on
+  the AEAD tag, not the JSON. (Broader fuzzing of the backup parser remains on
+  the roadmap.)
+- **Imports are all-or-nothing.** A merge decrypts every note before persisting
+  any, and rolls back notes already written if a later write fails, so a failed
+  import leaves nothing behind. A restore clears the target first, so residue
+  from an interrupted earlier restore can't survive beside a new vault header.
 - **Replacing an existing vault is destructive and confirmed.** Restoring over a
   device that already has a vault erases the current notes; the UI requires an
   explicit confirmation first, mirroring the plaintext-export gate. The restore

@@ -121,6 +121,17 @@ class NotesRepository {
     return imported;
   }
 
+  /// Undoes notes created by [addImportedNote] — used to roll back a merge
+  /// import that failed part-way, so a failed import leaves nothing behind.
+  /// Drops each note from memory and deletes its blob. Best-effort per id:
+  /// unknown ids and already-gone blobs are ignored.
+  Future<void> rollbackImportedNotes(Iterable<String> ids) async {
+    for (final id in ids) {
+      _notes.remove(id);
+      await store.deleteNoteBlob(id);
+    }
+  }
+
   Future<Note> updateNote(String id, {String? title, String? body}) async {
     final existing = getNote(id);
     if (existing == null) {

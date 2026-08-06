@@ -341,7 +341,7 @@ void main() {
     failing.failWrites = true;
     await expectLater(
       controller.restoreFromBackup(backup, replaceExisting: true),
-      throwsA(isA<Exception>()),
+      throwsA(isA<_InjectedWriteError>()),
     );
 
     // Fail-closed: no header was written, so there is no vault; the session is
@@ -352,7 +352,8 @@ void main() {
     expect(controller.canUnlockWithBiometric, isFalse);
   });
 
-  test('import suspends auto-lock and leaves the vault unlocked', () async {
+  test('import completes with auto-lock enabled and leaves the vault unlocked',
+      () async {
     controller.dispose();
     controller = await buildController(autoLockMinutes: 1);
     await controller.createVault('dest-pass');
@@ -360,10 +361,45 @@ void main() {
 
     final count = await controller.importFromBackup(backup, 'src');
     expect(count, 1);
-    // The import ran to completion without the auto-lock timer locking the
-    // vault mid-way; it stays unlocked with the imported note present.
+    // Exercises the timer suspend/restart path around a real import and checks
+    // it ends unlocked with the note present. (The mid-import race itself isn't
+    // deterministically reproducible in a unit test — the interval floor is one
+    // minute and the cheap-KDF import finishes in milliseconds — so this does
+    // not by itself prove the timer was cancelled while the import ran.)
     expect(controller.phase, AppPhase.unlocked);
     expect(controller.visibleNotes.length, 1);
+  });
+
+  test('a restore whose cleanup also fails still clears busy, needsCreation',
+      () async {
+    final settings = _ThrowingSettingsStore(File('${root.path}/settings.json'));
+    final failing =
+        _ArmableFailingStore(FileVaultStore(Directory('${root.path}/vault')));
+    controller.dispose();
+    controller = await buildController(
+      settingsStore: settings,
+      vaultStore: failing,
+    );
+
+    await controller.createVault('mine');
+    final n = await controller.newNote();
+    await controller.saveNote(n.id, title: 'Mine', body: 'keep');
+
+    final backup = await makeBackup(passphrase: 'fresh', notes: [('A', '1')]);
+
+    // Correlated failure (like a full disk): the restore write fails, and so
+    // does the settings write in the cleanup path.
+    failing.failWrites = true;
+    settings.failSaves = true;
+    await expectLater(
+      controller.restoreFromBackup(backup, replaceExisting: true),
+      throwsA(isA<_InjectedWriteError>()),
+    );
+
+    // The cleanup exception must not mask the restore error, strand busy, or
+    // leave a stale phase: busy is cleared and we fail closed to needsCreation.
+    expect(controller.busy, isFalse);
+    expect(controller.phase, AppPhase.needsCreation);
   });
 
   test('restoreFromBackup replaceExisting swaps in the backup vault', () async {

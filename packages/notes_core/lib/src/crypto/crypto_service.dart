@@ -86,6 +86,11 @@ class CryptoService {
   /// Note: [passphrase] is a Dart [String] and therefore immutable; we cannot
   /// reliably wipe it from memory (documented in SECURITY.md).
   Future<Uint8List> deriveKek(String passphrase, KdfParams params) async {
+    // Defence in depth: reject abusive cost parameters (e.g. from a tampered
+    // vault header) before Argon2id can try to allocate gigabytes or run for an
+    // unbounded time. Import already validates untrusted backups up front; this
+    // also covers the vault-unlock path.
+    params.validateCost();
     final kdf = Argon2id(
       parallelism: params.parallelism,
       memory: params.memoryKiB,

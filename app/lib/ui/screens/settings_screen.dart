@@ -316,6 +316,13 @@ class SettingsScreen extends StatelessWidget {
       messenger.showSnackBar(
         const SnackBar(content: Text('That backup isn\'t supported by this app.')),
       );
+    } on FileSystemException {
+      // The file is read before any storage change, so an unreadable pick means
+      // the restore never started and the current vault is untouched — don't
+      // claim data loss or leave Settings.
+      messenger.showSnackBar(
+        const SnackBar(content: Text('That file could not be read.')),
+      );
     } catch (_) {
       // A failure after validation means the old vault may already be gone and
       // the restore incomplete. Send the user to the unlock/create screen and

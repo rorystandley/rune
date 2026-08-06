@@ -169,6 +169,40 @@ void main() {
       // reader would recognise as a vault — no half-loaded, truncated note set.
       expect(await FileVaultStore(destDir).vaultExists(), isFalse);
     });
+
+    test('a fresh restore clears residue from an interrupted earlier restore',
+        () async {
+      final source1 = await vaultWith('p1', [('a', '1'), ('b', '2')]);
+      final backup1 = await exportOf(source1);
+
+      final destDir = await Directory.systemTemp.createTemp('notes_residue_');
+      addTearDown(() => destDir.delete(recursive: true));
+
+      // First restore fails after writing one blob → headerless residue.
+      final failing =
+          _FailOnNthBlobStore(FileVaultStore(destDir), failOnWrite: 2);
+      await expectLater(
+        ImportService(store: failing)
+            .restoreAsNewVault(await backup1.readAsString()),
+        throwsA(isA<_InjectedIoError>()),
+      );
+      final plainStore = FileVaultStore(destDir);
+      expect(await plainStore.vaultExists(), isFalse);
+      expect((await plainStore.listNoteIds()).isNotEmpty, isTrue); // residue
+
+      // Restoring a DIFFERENT backup into the same directory must clear the
+      // residue so the new vault is fully decryptable.
+      final source2 = await vaultWith('p2', [('x', '9')]);
+      final backup2 = await exportOf(source2);
+      await ImportService(store: plainStore)
+          .restoreAsNewVault(await backup2.readAsString());
+
+      final v = VaultService(store: plainStore);
+      await v.unlock('p2');
+      final repo = NotesRepository(vault: v, store: plainStore);
+      await repo.loadAll(); // would throw on a stale residue blob
+      expect(repo.listNotes().map((n) => n.body).toList(), ['9']);
+    });
   });
 
   group('mergeIntoUnlockedVault', () {
@@ -324,6 +358,40 @@ void main() {
       await dest.repo.loadAll();
       expect(dest.repo.listNotes().single.body, 'keep');
     });
+
+    test('a store write failure during merge rolls back — nothing imported',
+        () async {
+      final source = await vaultWith('bp', [
+        ('one', '1'),
+        ('two', '2'),
+        ('three', '3'),
+      ]);
+      final backup = await exportOf(source);
+
+      final destDir = await Directory.systemTemp.createTemp('notes_mergefail_');
+      addTearDown(() => destDir.delete(recursive: true));
+      // Fail on the second note the merge tries to persist.
+      final failing =
+          _FailOnNthBlobStore(FileVaultStore(destDir), failOnWrite: 2);
+      final destVault = VaultService(store: failing);
+      await destVault.createVault('dp', kdfParams: _cheapParams());
+      final destRepo = NotesRepository(vault: destVault, store: failing);
+      await destRepo.loadAll();
+
+      await expectLater(
+        ImportService(store: failing).mergeIntoUnlockedVault(
+          await backup.readAsString(),
+          backupPassphrase: 'bp',
+          repository: destRepo,
+        ),
+        throwsA(isA<_InjectedIoError>()),
+      );
+
+      // The first note was written then rolled back: nothing remains in memory
+      // or on disk.
+      expect(destRepo.count, 0);
+      expect(await FileVaultStore(destDir).listNoteIds(), isEmpty);
+    });
   });
 
   group('parse validation', () {
@@ -399,6 +467,22 @@ void main() {
       final header = _dummyVaultHeader();
       (header['kdf'] as Map<String, dynamic>)['iterations'] =
           KdfParams.maxIterations + 1;
+      final bad = jsonEncode({
+        'format': ExportService.backupFormat,
+        'version': ExportService.backupVersion,
+        'vault': header,
+        'notes': <String, String>{},
+      });
+      expect(() => importer.parse(bad), throwsA(isA<FormatException>()));
+    });
+
+    test('individually-valid costs whose product is too large are rejected', () {
+      // Each parameter sits at its cap, but memory × iterations exceeds the
+      // combined-work ceiling.
+      final header = _dummyVaultHeader();
+      (header['kdf'] as Map<String, dynamic>)
+        ..['memoryKiB'] = KdfParams.maxMemoryKiB
+        ..['iterations'] = KdfParams.maxIterations;
       final bad = jsonEncode({
         'format': ExportService.backupFormat,
         'version': ExportService.backupVersion,

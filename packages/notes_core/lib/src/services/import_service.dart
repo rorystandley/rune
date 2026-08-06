@@ -128,9 +128,12 @@ class ImportService {
     if (await store.vaultExists() && !overwriteExisting) {
       throw const VaultAlreadyExistsException();
     }
-    if (overwriteExisting) {
-      await store.deleteEverything();
-    }
+    // Always clear the target before writing — this removes an existing vault
+    // (the overwrite case) *and* any headerless residue left by a previously
+    // interrupted restore. Without it, a fresh restore (which sees no header,
+    // so takes this non-overwrite path) could write its header beside a stale
+    // blob that the new key can't decrypt, breaking the next loadAll.
+    await store.deleteEverything();
     for (final entry in bundle.notes.entries) {
       await store.writeNoteBlob(entry.key, entry.value);
     }
@@ -148,10 +151,10 @@ class ImportService {
   /// and re-sealed under the current vault's key — so existing notes are never
   /// touched and duplicates simply coexist. Throws [WrongPassphraseException]
   /// if [backupPassphrase] is wrong, and [DecryptionFailedException] if any note
-  /// blob fails authentication. In both failure cases **nothing is imported**:
-  /// every blob is decrypted first, and notes are persisted only once all of
-  /// them succeed, so a tampered blob part-way through can't leave a partial
-  /// import behind. Returns the number of notes imported.
+  /// blob fails authentication. In every failure case **nothing is imported**:
+  /// every blob is decrypted first (so a tampered blob aborts before any write),
+  /// and if a store write fails part-way through persisting, the notes already
+  /// written are rolled back. Returns the number of notes imported.
   Future<int> mergeIntoUnlockedVault(
     String jsonString, {
     required String backupPassphrase,
@@ -174,8 +177,21 @@ class ImportService {
             await crypto.open(blob, backupDek, label: 'imported note');
         decoded.add(Note.fromEncodedBytes(plaintext));
       }
-      for (final note in decoded) {
-        await repository.addImportedNote(note);
+      // Persist the decrypted notes. If a store write fails part-way, roll back
+      // the ones already written so a failed merge imports nothing.
+      final importedIds = <String>[];
+      try {
+        for (final note in decoded) {
+          final stored = await repository.addImportedNote(note);
+          importedIds.add(stored.id);
+        }
+      } catch (_) {
+        try {
+          await repository.rollbackImportedNotes(importedIds);
+        } catch (_) {
+          // Keep the original write failure as the surfaced error.
+        }
+        rethrow;
       }
       return decoded.length;
     } finally {

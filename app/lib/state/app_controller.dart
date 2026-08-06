@@ -430,6 +430,11 @@ class AppController extends ChangeNotifier {
       // its header leaves no vault, so we land back on the create/restore
       // screen rather than showing notes that are gone.
       if (storageMayHaveChanged) {
+        // Dropping the in-memory session (zeroing the DEK, clearing notes) must
+        // never be skipped. The disk-touching cleanup below can itself throw —
+        // a full disk that failed the restore write will also fail the settings
+        // write — so isolate it: a cleanup failure must not mask the original
+        // restore error or strand the UI with `busy` stuck true.
         _autoLockTimer?.cancel();
         _autoLockTimer = null;
         repo.clear();
@@ -438,9 +443,16 @@ class AppController extends ChangeNotifier {
         _search = '';
         _unlockError = null;
         _biometricUnlockError = null;
-        await _disableBiometricUnlock(saveSettings: true);
-        final exists = await vault.vaultExists();
-        await _refreshBiometricUnlockState(vaultExists: exists, notify: false);
+        var exists = false;
+        try {
+          await _disableBiometricUnlock(saveSettings: true);
+          exists = await vault.vaultExists();
+          await _refreshBiometricUnlockState(vaultExists: exists, notify: false);
+        } catch (_) {
+          // Best-effort: the vault is already locked in memory. If we can't
+          // confirm a vault on disk, fail closed to the create/restore screen.
+          _biometricUnlockReady = false;
+        }
         _phase = exists ? AppPhase.locked : AppPhase.needsCreation;
         notifyListeners();
       }
@@ -459,10 +471,11 @@ class AppController extends ChangeNotifier {
   Future<int> importFromBackup(File file, String backupPassphrase) async {
     _setBusy(true);
     // A large import plus Argon2id (with the backup's own cost parameters) can
-    // outlast the auto-lock interval. If the timer fired mid-import it would
-    // lock the vault and zero the DEK, aborting the persist loop partway and
-    // breaking the atomicity merge otherwise guarantees — so suspend it for the
-    // duration and restart it when we're done.
+    // outlast the auto-lock interval. Locking mid-import would zero the DEK and
+    // abort the persist loop partway, breaking the atomicity merge otherwise
+    // guarantees. Two paths can lock: the auto-lock timer (suspended here, and
+    // restarted in the finally) and lock-on-background (held off by the `busy`
+    // guard in [onSentToBackground] while the import runs).
     _autoLockTimer?.cancel();
     _autoLockTimer = null;
     try {
@@ -487,6 +500,9 @@ class AppController extends ChangeNotifier {
   }
 
   void onSentToBackground() {
+    // A running import or restore holds the DEK for its persist loop. Locking
+    // here would abort it part-way and leave storage inconsistent, so defer.
+    if (_busy) return;
     if (_phase == AppPhase.unlocked && _settings.lockOnBackground) lock();
   }
 
