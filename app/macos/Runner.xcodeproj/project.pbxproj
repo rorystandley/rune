@@ -216,7 +216,7 @@
 			packageProductDependencies = (
 				78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */,
 			);
-			productName = Runner;
+			productName = Rune;
 			productReference = 33CC10ED2044A3C60003C045 /* Rune.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -512,6 +512,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_NAME = Rune;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -648,6 +649,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_NAME = Rune;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -672,6 +674,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_NAME = Rune;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
