@@ -402,6 +402,24 @@ void main() {
     expect(controller.phase, AppPhase.needsCreation);
   });
 
+  test('a successful restore whose cleanup save fails still reports locked',
+      () async {
+    final settings = _ThrowingSettingsStore(File('${root.path}/settings.json'));
+    controller.dispose();
+    controller = await buildController(settingsStore: settings);
+
+    final backup = await makeBackup(passphrase: 'old-phone', notes: [('N', 'b')]);
+    // The restore itself succeeds; only the cleanup settings-write fails.
+    settings.failSaves = true;
+    final count = await controller.restoreFromBackup(backup);
+
+    expect(count, 1);
+    // The vault is on disk, so the phase must say locked — not send the user to
+    // create a vault that already exists — despite the cleanup failure.
+    expect(controller.phase, AppPhase.locked);
+    expect(controller.busy, isFalse);
+  });
+
   test('restoreFromBackup replaceExisting swaps in the backup vault', () async {
     await controller.createVault('mine');
     final stale = await controller.newNote();

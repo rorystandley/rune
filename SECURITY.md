@@ -194,13 +194,19 @@ one Rune wrote. That input is treated as untrusted:
   notes directory. The Argon2id cost parameters in the header are bounded
   (memory, iterations, parallelism, and their combined work) and rejected if
   abusive — enforced both at import and inside the KDF — so a crafted header
-  can't exhaust memory or hang unlock/import. Integrity of note content rests on
-  the AEAD tag, not the JSON. (Broader fuzzing of the backup parser remains on
-  the roadmap.)
-- **Imports are all-or-nothing.** A merge decrypts every note before persisting
-  any, and rolls back notes already written if a later write fails, so a failed
-  import leaves nothing behind. A restore clears the target first, so residue
-  from an interrupted earlier restore can't survive beside a new vault header.
+  can't make key derivation exhaust memory or run unbounded. Integrity of note
+  content rests on the AEAD tag, not the JSON. The parser does **not** yet cap
+  the overall backup size, note count, or per-blob size, so a deliberately huge
+  file could still exhaust memory while being read — the backup is one the user
+  chose to import, not attacker-pushed, but bounding it (and broader fuzzing of
+  the parser) remains on the roadmap.
+- **A failed import tries to leave nothing behind.** A merge decrypts every note
+  before persisting any (so a tampered blob aborts before any write), and rolls
+  back notes already written if a later write fails. That rollback is
+  best-effort: if the rollback deletions themselves fail, some imported notes may
+  remain — the operation still reports the original failure. A restore clears the
+  target first, so residue from an interrupted earlier restore can't survive
+  beside a new vault header.
 - **Replacing an existing vault is destructive and confirmed.** Restoring over a
   device that already has a vault erases the current notes; the UI requires an
   explicit confirmation first, mirroring the plaintext-export gate. The restore

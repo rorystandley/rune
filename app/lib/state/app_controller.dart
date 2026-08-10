@@ -443,14 +443,21 @@ class AppController extends ChangeNotifier {
         _search = '';
         _unlockError = null;
         _biometricUnlockError = null;
+        // Read the on-disk state first, in its own guard, so the phase always
+        // reflects reality: a successful restore must report `locked` even if
+        // the biometric cleanup below fails. Only a failure of the existence
+        // check itself falls back to needsCreation.
         var exists = false;
         try {
-          await _disableBiometricUnlock(saveSettings: true);
           exists = await vault.vaultExists();
+        } catch (_) {
+          // Can't confirm what's on disk — fail closed to create/restore.
+        }
+        try {
+          await _disableBiometricUnlock(saveSettings: true);
           await _refreshBiometricUnlockState(vaultExists: exists, notify: false);
         } catch (_) {
-          // Best-effort: the vault is already locked in memory. If we can't
-          // confirm a vault on disk, fail closed to the create/restore screen.
+          // Best-effort: the vault is already locked in memory.
           _biometricUnlockReady = false;
         }
         _phase = exists ? AppPhase.locked : AppPhase.needsCreation;

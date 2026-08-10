@@ -261,6 +261,12 @@ class SettingsScreen extends StatelessWidget {
           'That backup failed its integrity check and was not imported.',
         );
       }
+    } on FileSystemException {
+      // The file is read before the import starts, so an unreadable pick means
+      // nothing was imported — it may still be a valid backup.
+      if (context.mounted) {
+        _snack(context, 'That file could not be read.');
+      }
     } catch (_) {
       if (context.mounted) {
         _snack(context, 'That file isn\'t a valid Rune backup.');
