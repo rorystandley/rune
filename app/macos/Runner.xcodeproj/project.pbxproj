@@ -414,7 +414,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = co.rorystandley.rune.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/notes_app.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/notes_app";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Rune.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Rune";
 			};
 			name = Debug;
 		};
@@ -428,7 +428,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = co.rorystandley.rune.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/notes_app.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/notes_app";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Rune.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Rune";
 			};
 			name = Release;
 		};
@@ -442,7 +442,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = co.rorystandley.rune.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/notes_app.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/notes_app";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Rune.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Rune";
 			};
 			name = Profile;
 		};
