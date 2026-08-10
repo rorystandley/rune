@@ -94,6 +94,44 @@ class NotesRepository {
     return note;
   }
 
+  /// Adds a note that came from an imported backup. Mints a *fresh* id — so it
+  /// can never collide with an existing note — but preserves the source note's
+  /// title, body, timestamps, pin state, and soft-deleted state. Encrypts and
+  /// persists immediately under this vault's key. Returns the stored note.
+  ///
+  /// A soft-deleted note keeps its original `deletedAt`, so it lands back in
+  /// Recently Deleted rather than the live list. That also means the retention
+  /// window is measured from the original deletion: importing a note that was
+  /// deleted longer ago than [recentlyDeletedRetention] will see it purged by
+  /// [_purgeExpired] on the next [loadAll], exactly as if it had been deleted
+  /// that long ago in this vault. This is intended — an old deletion stays a
+  /// deletion — not a loss of freshly imported data.
+  Future<Note> addImportedNote(Note source) async {
+    final imported = Note(
+      id: _newId(),
+      title: source.title,
+      body: source.body,
+      createdAt: source.createdAt,
+      updatedAt: source.updatedAt,
+      pinned: source.pinned,
+      deletedAt: source.deletedAt,
+    );
+    await _persist(imported);
+    _notes[imported.id] = imported;
+    return imported;
+  }
+
+  /// Undoes notes created by [addImportedNote] — used to roll back a merge
+  /// import that failed part-way, so a failed import leaves nothing behind.
+  /// Drops each note from memory and deletes its blob. Best-effort per id:
+  /// unknown ids and already-gone blobs are ignored.
+  Future<void> rollbackImportedNotes(Iterable<String> ids) async {
+    for (final id in ids) {
+      _notes.remove(id);
+      await store.deleteNoteBlob(id);
+    }
+  }
+
   Future<Note> updateNote(String id, {String? title, String? body}) async {
     final existing = getNote(id);
     if (existing == null) {

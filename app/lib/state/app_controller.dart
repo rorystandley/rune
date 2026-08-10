@@ -27,14 +27,19 @@ class AppController extends ChangeNotifier {
     required this.recorder,
     BiometricUnlockStore? biometricUnlockStore,
     CryptoService? crypto,
+    // Test seam: inject a store (e.g. one that fails writes). Named distinctly
+    // from the `store` field so the field — not this nullable parameter — is
+    // what the constructor body below resolves `store` to.
+    VaultStore? initialStore,
     this.createKdfParams, // test seam: cheap params in tests, null = production
   }) : biometricUnlockStore =
            biometricUnlockStore ?? const DisabledBiometricUnlockStore(),
-       store = FileVaultStore(vaultDir) {
+       store = initialStore ?? FileVaultStore(vaultDir) {
     final c = crypto ?? CryptoService();
     vault = VaultService(store: store, crypto: c);
     repo = NotesRepository(vault: vault, store: store);
     exporter = ExportService(store: store);
+    importer = ImportService(store: store);
   }
 
   final Directory vaultDir;
@@ -48,10 +53,11 @@ class AppController extends ChangeNotifier {
   final BiometricUnlockStore biometricUnlockStore;
   final KdfParams? createKdfParams;
 
-  late final FileVaultStore store;
+  late final VaultStore store;
   late final VaultService vault;
   late final NotesRepository repo;
   late final ExportService exporter;
+  late final ImportService importer;
 
   AppPhase _phase = AppPhase.loading;
   AppSettings _settings = const AppSettings();
@@ -377,6 +383,123 @@ class AppController extends ChangeNotifier {
     return exporter.exportPlaintext(target, repo, confirmed: confirmed);
   }
 
+  // --------------------------------------------------------------- import ---
+
+  /// Restores an encrypted backup as this device's vault — the fresh-device
+  /// path. Copies the backup's (already encrypted) header and note blobs to
+  /// storage without decrypting anything, then leaves the app **locked** so the
+  /// user unlocks with the backup's passphrase.
+  ///
+  /// Refuses to overwrite an existing vault unless [replaceExisting] is set;
+  /// replacing is destructive, so the UI confirms first. Returns the number of
+  /// notes restored. Propagates [VaultAlreadyExistsException] and
+  /// [FormatException] for the UI to surface.
+  Future<int> restoreFromBackup(
+    File file, {
+    bool replaceExisting = false,
+  }) async {
+    _setBusy(true);
+    // The importer validates the whole backup *before* it deletes or writes
+    // anything, so the pre-write failures below leave storage untouched and the
+    // current session valid. Any other outcome — success, or a failure once
+    // writing has begun — means storage no longer matches the live session, so
+    // it must be reset.
+    var storageMayHaveChanged = false;
+    try {
+      final json = await file.readAsString();
+      try {
+        final count = await importer.restoreAsNewVault(
+          json,
+          overwriteExisting: replaceExisting,
+        );
+        storageMayHaveChanged = true; // success: the vault was replaced
+        return count;
+      } on FormatException {
+        rethrow; // invalid backup, rejected during validation — nothing written
+      } on UnsupportedVaultException {
+        rethrow; // unknown cipher, rejected during validation — nothing written
+      } on VaultAlreadyExistsException {
+        rethrow; // refused before any delete/write — nothing changed
+      } catch (_) {
+        storageMayHaveChanged = true; // failed mid-write — storage is uncertain
+        rethrow;
+      }
+    } finally {
+      // Drop the current session and cached biometric key, then set the phase
+      // from what is actually on disk. A fail-closed restore that never wrote
+      // its header leaves no vault, so we land back on the create/restore
+      // screen rather than showing notes that are gone.
+      if (storageMayHaveChanged) {
+        // Dropping the in-memory session (zeroing the DEK, clearing notes) must
+        // never be skipped. The disk-touching cleanup below can itself throw —
+        // a full disk that failed the restore write will also fail the settings
+        // write — so isolate it: a cleanup failure must not mask the original
+        // restore error or strand the UI with `busy` stuck true.
+        _autoLockTimer?.cancel();
+        _autoLockTimer = null;
+        repo.clear();
+        vault.lock();
+        _selectedId = null;
+        _search = '';
+        _unlockError = null;
+        _biometricUnlockError = null;
+        // Read the on-disk state first, in its own guard, so the phase always
+        // reflects reality: a successful restore must report `locked` even if
+        // the biometric cleanup below fails. Only a failure of the existence
+        // check itself falls back to needsCreation.
+        var exists = false;
+        try {
+          exists = await vault.vaultExists();
+        } catch (_) {
+          // Can't confirm what's on disk — fail closed to create/restore.
+        }
+        try {
+          await _disableBiometricUnlock(saveSettings: true);
+          await _refreshBiometricUnlockState(vaultExists: exists, notify: false);
+        } catch (_) {
+          // Best-effort: the vault is already locked in memory.
+          _biometricUnlockReady = false;
+        }
+        _phase = exists ? AppPhase.locked : AppPhase.needsCreation;
+        notifyListeners();
+      }
+      _setBusy(false);
+    }
+  }
+
+  /// Merges an encrypted backup's notes into the current, already-unlocked
+  /// vault. Needs the passphrase the backup was made with. Each note is
+  /// decrypted in memory and re-sealed under this vault's key with a fresh id,
+  /// so nothing existing is overwritten. Returns the number of notes imported.
+  ///
+  /// Propagates [WrongPassphraseException] (nothing is imported),
+  /// [DecryptionFailedException] (a tampered blob), and [FormatException] for
+  /// the UI to surface.
+  Future<int> importFromBackup(File file, String backupPassphrase) async {
+    _setBusy(true);
+    // A large import plus Argon2id (with the backup's own cost parameters) can
+    // outlast the auto-lock interval. Locking mid-import would zero the DEK and
+    // abort the persist loop partway, breaking the atomicity merge otherwise
+    // guarantees. Two paths can lock: the auto-lock timer (suspended here, and
+    // restarted in the finally) and lock-on-background (held off by the `busy`
+    // guard in [onSentToBackground] while the import runs).
+    _autoLockTimer?.cancel();
+    _autoLockTimer = null;
+    try {
+      final json = await file.readAsString();
+      final count = await importer.mergeIntoUnlockedVault(
+        json,
+        backupPassphrase: backupPassphrase,
+        repository: repo,
+      );
+      notifyListeners(); // surface the newly imported notes
+      return count;
+    } finally {
+      _resetAutoLock();
+      _setBusy(false);
+    }
+  }
+
   // ------------------------------------------------------------ auto-lock ---
 
   void onUserActivity() {
@@ -384,6 +507,9 @@ class AppController extends ChangeNotifier {
   }
 
   void onSentToBackground() {
+    // A running import or restore holds the DEK for its persist loop. Locking
+    // here would abort it part-way and leave storage inconsistent, so defer.
+    if (_busy) return;
     if (_phase == AppPhase.unlocked && _settings.lockOnBackground) lock();
   }
 
@@ -476,11 +602,7 @@ class AppController extends ChangeNotifier {
     ].join('|');
   }
 
-  void _zero(Uint8List bytes) {
-    for (var i = 0; i < bytes.length; i++) {
-      bytes[i] = 0;
-    }
-  }
+  void _zero(Uint8List bytes) => zeroBytes(bytes);
 
   String _stamp() =>
       DateTime.now().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');

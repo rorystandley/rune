@@ -36,6 +36,47 @@ class KdfParams {
   static const int defaultParallelism = 1;
   static const int saltLength = 16;
 
+  /// Device-safe upper bounds on the cost parameters, used to reject abusive
+  /// values that arrive in an *untrusted* header (e.g. an imported backup).
+  /// Without a cap, a crafted `memoryKiB` of, say, 64 GiB would make Argon2id
+  /// try to allocate that much and take the app down when the header is used to
+  /// derive a key. The ceilings sit above any sane setting for this app (default
+  /// is 64 MiB / 3 passes; even an aggressive mobile calibration stays well
+  /// under 512 MiB) so they never reject a legitimately-configured vault, while
+  /// keeping the worst case survivable on a phone.
+  static const int minMemoryKiB = 8; // Argon2id's own floor
+  static const int maxMemoryKiB = 512 * 1024; // 512 MiB
+  static const int maxIterations = 24;
+  static const int maxParallelism = 16;
+
+  /// Cap on total work (memory × passes). Bounds derivation *time* even when the
+  /// individual parameters each look reasonable, so a header can't combine a
+  /// large memory with many passes to hang unlock/import. Default work is
+  /// 64 MiB × 3 = 196 608; this ceiling is ~21× that.
+  static const int maxTotalWorkKiB = 512 * 1024 * 8; // 512 MiB × 8 passes
+
+  /// Throws [FormatException] if any cost parameter is out of the supported
+  /// range, or the combined work is too large. Call this on parameters parsed
+  /// from untrusted input (and it is also enforced in the KDF) before deriving a
+  /// key. Bounds are inclusive.
+  void validateCost() {
+    if (memoryKiB < minMemoryKiB || memoryKiB > maxMemoryKiB) {
+      throw FormatException(
+          'Argon2id memory cost out of range: $memoryKiB KiB');
+    }
+    if (iterations < 1 || iterations > maxIterations) {
+      throw FormatException('Argon2id iterations out of range: $iterations');
+    }
+    if (parallelism < 1 || parallelism > maxParallelism) {
+      throw FormatException('Argon2id parallelism out of range: $parallelism');
+    }
+    if (memoryKiB * iterations > maxTotalWorkKiB) {
+      throw FormatException(
+          'Argon2id total work out of range: ${memoryKiB * iterations} '
+          '(memory × iterations)');
+    }
+  }
+
   Map<String, dynamic> toJson() => {
         'algorithm': 'argon2id',
         'memoryKiB': memoryKiB,

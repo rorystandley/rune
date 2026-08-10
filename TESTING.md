@@ -75,6 +75,26 @@ Both are expected to report **no issues**.
 - **Plaintext export without confirmation throws and writes nothing.**
 - Plaintext export *with* confirmation writes readable Markdown.
 
+**`import_service_test.dart`** — reading backups back in:
+- **Restore round-trip:** a backup restored onto a fresh store unlocks with the
+  original passphrase and yields the same notes.
+- Restore **refuses to clobber an existing vault** without `overwriteExisting`
+  (the existing vault is left intact); with it, the vault is replaced wholesale.
+- **Merge round-trip:** a backup merged into a *different* vault is readable
+  under that vault's passphrase, with timestamps and pin state preserved and a
+  fresh id (no collisions).
+- A **wrong backup passphrase** on merge throws and imports nothing.
+- **Merge writes only ciphertext** — every file under the destination vault is
+  scanned and asserted free of the plaintext.
+- A **tampered note blob** fails authentication (`DecryptionFailedException`),
+  and a tampered blob in a **multi-note** backup imports **nothing** — the
+  destination is unchanged in memory and on disk (merge decrypts all blobs
+  before persisting any).
+- An **interrupted restore fails closed:** a write error part-way through a
+  restore leaves no vault a reader would recognise (the header is written last).
+- Parser rejects non-JSON, the wrong format id, a future version, and unsafe
+  note ids with a `FormatException`.
+
 **`logging_and_at_rest_test.dart`** — the "don't betray the user" tests:
 - A full create/edit/search/lock/unlock cycle with `print` intercepted asserts
   the **passphrase and note body never appear in output** (no secret logging).
@@ -94,6 +114,12 @@ Both are expected to report **no issues**.
   and refreshes the cache binding after a passphrase change.
 - Encrypted backup export contains no plaintext.
 - Plaintext export requires confirmation.
+- **Restore** from a backup adopts it and locks for the backup's passphrase;
+  it refuses to overwrite an existing vault unless replacement is requested, and
+  a replacement **clears any cached biometric unlock** so a stale key can't open
+  the restored vault.
+- **Import (merge)** adds a backup's notes to the current vault; a wrong backup
+  passphrase is rejected and imports nothing.
 
 **`widget_test.dart`** — UI smoke + integration:
 - First launch renders the **create-vault screen with the irreversibility

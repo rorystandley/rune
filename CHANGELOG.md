@@ -4,6 +4,26 @@ All notable changes to Rune are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Encrypted-backup import & restore.** The `.notesbak` bundles Rune already
+  exports can now be read back in, closing the loop on moving to a new device.
+  - *Restore* (offered on the first-run screen when there is no vault yet)
+    adopts a backup wholesale: it copies the encrypted header and note blobs to
+    storage without decrypting anything, then leaves the app locked so you
+    unlock with the passphrase that backup was made with.
+  - *Import* (Settings → Backup & export) merges a backup's notes into the
+    current, unlocked vault. Each note is decrypted with the backup's passphrase
+    in memory and re-sealed under this vault's key with a fresh id, so nothing
+    already on the device is overwritten.
+  - A separate, explicitly confirmed *Restore (replace this vault)* action
+    covers replacing the notes on a device that already has a vault.
+  - Backups are chosen with the native file picker (`file_selector`). Malformed
+    files, unsupported versions, and wrong passphrases fail safely with a clear
+    message and never write plaintext to disk — all proven by new tests.
+
 ## [0.4.1] - 2026-07-12
 
 Phone polish reported from 0.4.0, same privacy posture.

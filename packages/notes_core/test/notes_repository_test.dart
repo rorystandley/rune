@@ -36,6 +36,42 @@ void main() {
     expect(repo.getNote(n.id)!.body, 'Body');
   });
 
+  test('addImportedNote mints a fresh id but preserves fields', () async {
+    final created = DateTime.utc(2020, 5, 6, 7, 8, 9);
+    final updated = DateTime.utc(2021, 9, 10, 11, 12, 13);
+    final imported = await repo.addImportedNote(Note(
+      id: 'sourceid',
+      title: 'T',
+      body: 'B',
+      createdAt: created,
+      updatedAt: updated,
+      pinned: true,
+    ));
+    expect(imported.id, isNot('sourceid'));
+    expect(imported.createdAt, created);
+    expect(imported.updatedAt, updated);
+    expect(imported.pinned, isTrue);
+    expect(repo.getNote(imported.id)!.body, 'B');
+  });
+
+  test('addImportedNote keeps a soft-deleted note in Recently Deleted',
+      () async {
+    // Recent enough not to be purged by the retention window.
+    final deletedAt = DateTime.now().toUtc().subtract(const Duration(days: 1));
+    final imported = await repo.addImportedNote(Note(
+      id: 'sourceid',
+      title: 'Trashed',
+      body: 'gone',
+      createdAt: DateTime.utc(2022),
+      updatedAt: DateTime.utc(2022),
+      deletedAt: deletedAt,
+    ));
+    // Not in the live list; sitting in Recently Deleted with its original time.
+    expect(repo.getNote(imported.id), isNull);
+    expect(repo.listDeleted().single.id, imported.id);
+    expect(repo.listDeleted().single.deletedAt, deletedAt);
+  });
+
   test('update changes content', () async {
     final n = await repo.createNote(title: 'A', body: 'one');
     final before = n.updatedAt;
