@@ -1,0 +1,7 @@
+Bring your notes to a new device, same privacy posture.
+
+* Restore an encrypted backup onto a fresh device, then unlock with that backup's passphrase.
+* Import a backup's notes into your current vault, or replace this device's vault entirely.
+* Backups are chosen with the native file picker; a wrong or altered file fails safely.
+
+Still fully offline: no network, no telemetry, no accounts. Not yet audited.
