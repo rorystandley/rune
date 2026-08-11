@@ -5,6 +5,7 @@ import 'package:notes_core/notes_core.dart';
 
 import '../../app_version.g.dart';
 import '../../platform/backup_file_picker.dart';
+import '../../platform/export_delivery.dart';
 import '../../state/app_controller.dart';
 import '../../state/app_scope.dart';
 import '../../state/app_settings.dart';
@@ -185,9 +186,29 @@ class SettingsScreen extends StatelessWidget {
     AppController controller,
   ) async {
     try {
-      final file = await controller.exportEncryptedBackup();
-      if (context.mounted) {
-        await _showPath(context, 'Encrypted backup saved', file.path);
+      if (supportsSaveLocationPicker) {
+        // Desktop: the user picks the exact destination up front.
+        final path = await chooseExportFileLocation(
+          suggestedName: controller.suggestedBackupFileName(),
+        );
+        if (path == null) return; // cancelled
+        final file = await controller.exportEncryptedBackup(
+          target: File(path),
+        );
+        if (context.mounted) {
+          await _showPath(context, 'Encrypted backup saved', file.path);
+        }
+      } else {
+        // Mobile: stage privately, hand to the share sheet so the user can
+        // place it somewhere reachable (Save to Files, another app, ...), then
+        // delete the staged copy so nothing lingers on the device.
+        final origin = _shareOrigin(context);
+        final file = await controller.exportEncryptedBackup();
+        try {
+          await shareExportedFiles([file.path], origin: origin);
+        } finally {
+          if (await file.exists()) await file.delete();
+        }
       }
     } catch (e) {
       if (context.mounted) _snack(context, 'Export failed.');
@@ -209,17 +230,55 @@ class SettingsScreen extends StatelessWidget {
     );
     if (!ok) return;
     try {
-      final dir = await controller.exportPlaintext(confirmed: true);
-      if (context.mounted) {
-        await _showPath(
-          context,
-          'Plaintext export (UNENCRYPTED) saved',
-          dir.path,
+      if (supportsSaveLocationPicker) {
+        // Desktop: user picks a folder; we write the Markdown files into a
+        // timestamped subfolder inside it.
+        final dir = await chooseExportDirectory();
+        if (dir == null) return; // cancelled
+        final target = Directory(
+          '$dir/${controller.suggestedPlaintextFolderName()}',
         );
+        final out = await controller.exportPlaintext(
+          confirmed: true,
+          target: target,
+        );
+        if (context.mounted) {
+          await _showPath(
+            context,
+            'Plaintext export (UNENCRYPTED) saved',
+            out.path,
+          );
+        }
+      } else {
+        // Mobile: stage the folder, share every file so the user can save them
+        // where they choose, then delete the staging folder. Plaintext note
+        // content must never linger in app storage after the share completes.
+        if (!context.mounted) return;
+        final origin = _shareOrigin(context);
+        final out = await controller.exportPlaintext(confirmed: true);
+        try {
+          final files = out
+              .listSync()
+              .whereType<File>()
+              .map((f) => f.path)
+              .toList();
+          if (files.isNotEmpty) {
+            await shareExportedFiles(files, origin: origin);
+          }
+        } finally {
+          if (await out.exists()) await out.delete(recursive: true);
+        }
       }
     } catch (e) {
       if (context.mounted) _snack(context, 'Export failed.');
     }
+  }
+
+  /// Source rect for the share popover, which iPad/macOS require to anchor it.
+  Rect? _shareOrigin(BuildContext context) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
   }
 
   Future<File?> _pickBackup(BuildContext context) async {

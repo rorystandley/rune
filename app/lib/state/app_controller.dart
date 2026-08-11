@@ -366,21 +366,41 @@ class AppController extends ChangeNotifier {
 
   // --------------------------------------------------------------- export ---
 
-  Future<File> exportEncryptedBackup() async {
-    final target = File('${exportsDir.path}/notes-backup-${_stamp()}.notesbak');
-    return exporter.exportEncryptedBackup(target);
+  /// Default filenames for the "Save As" dialog (desktop) and for the private
+  /// staging copy that gets shared (mobile). Timestamped so repeat exports
+  /// don't collide.
+  String suggestedBackupFileName() => 'notes-backup-${_stamp()}.notesbak';
+  String suggestedNoteFileName() => 'note-${_stamp()}.notesbak';
+  String suggestedPlaintextFolderName() => 'notes-plaintext-${_stamp()}';
+
+  /// Writes the encrypted backup to [target]. When [target] is null (mobile),
+  /// it is staged in the app's exports directory so the caller can hand it to
+  /// the OS share sheet; on desktop the UI passes the user's chosen location.
+  Future<File> exportEncryptedBackup({File? target}) async {
+    final dest =
+        target ?? File('${exportsDir.path}/${suggestedBackupFileName()}');
+    return exporter.exportEncryptedBackup(dest);
   }
 
   /// Encrypted export of a single note, in the same format as a full backup
-  /// (so it restores the same way and needs the same passphrase).
-  Future<File> exportEncryptedNote(String id) async {
-    final target = File('${exportsDir.path}/note-${_stamp()}.notesbak');
-    return exporter.exportEncryptedNote(target, id);
+  /// (so it restores the same way and needs the same passphrase). See
+  /// [exportEncryptedBackup] for how [target] is resolved.
+  Future<File> exportEncryptedNote(String id, {File? target}) async {
+    final dest =
+        target ?? File('${exportsDir.path}/${suggestedNoteFileName()}');
+    return exporter.exportEncryptedNote(dest, id);
   }
 
-  Future<Directory> exportPlaintext({required bool confirmed}) async {
-    final target = Directory('${exportsDir.path}/notes-plaintext-${_stamp()}');
-    return exporter.exportPlaintext(target, repo, confirmed: confirmed);
+  /// Writes the plaintext (unencrypted) export as a folder of Markdown files.
+  /// See [exportEncryptedBackup] for how [target] is resolved.
+  Future<Directory> exportPlaintext({
+    required bool confirmed,
+    Directory? target,
+  }) async {
+    final dest =
+        target ??
+        Directory('${exportsDir.path}/${suggestedPlaintextFolderName()}');
+    return exporter.exportPlaintext(dest, repo, confirmed: confirmed);
   }
 
   // --------------------------------------------------------------- import ---

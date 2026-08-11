@@ -6,6 +6,22 @@ All notable changes to Rune are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- **You now choose where exports go, and can reach them afterwards.** Exports
+  previously landed in an app-private folder that, on iOS especially, was not
+  reachable from the Files app, so the saved file was effectively lost.
+  - On desktop (macOS, Windows, Linux) every export (encrypted backup, encrypted
+    single note, plaintext folder) now opens a native "Save As" / folder dialog
+    so you pick the exact destination. On the sandboxed Mac App Store build this
+    is also what grants the app write access to the chosen location.
+  - On mobile (iOS, Android) exports are handed to the system share sheet, so
+    "Save to Files", AirDrop, or another app can place them somewhere you can
+    open later. The staged copy is deleted once sharing finishes, so no export
+    (least of all a plaintext one) lingers in app storage.
+  - Added the `com.apple.security.files.user-selected.read-write` entitlement to
+    the macOS build so the save dialog's chosen location is actually writable.
+
 ## [0.5.0] - 2026-08-10
 
 ### Added

@@ -7,9 +7,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/app.dart';
 import 'package:notes_app/platform/audio_recorder.dart';
 import 'package:notes_app/platform/biometric_unlock_store.dart';
+import 'package:notes_app/platform/export_delivery.dart' as export_delivery;
 import 'package:notes_app/state/app_controller.dart';
 import 'package:notes_app/state/app_scope.dart';
 import 'package:notes_app/state/app_settings.dart';
+import 'package:notes_app/ui/screens/settings_screen.dart';
 import 'package:notes_app/ui/widgets/markdown_preview.dart';
 import 'package:notes_app/ui/widgets/note_editor.dart';
 import 'package:notes_app/ui/widgets/note_info_sheet.dart';
@@ -1332,6 +1334,20 @@ void main() {
       await controller.saveNote(note.id, title: 'Sharable', body: 'hello');
     });
 
+    // The share sheet routes single-note export through the platform delivery
+    // seam. Stand in for the desktop "Save As" dialog with a fixed path in the
+    // exports dir so the flow runs headless; restore the real picker after.
+    final originalPicker = export_delivery.chooseExportFileLocation;
+    final originalSupports = export_delivery.supportsSaveLocationPicker;
+    export_delivery.supportsSaveLocationPicker = true;
+    export_delivery.chooseExportFileLocation =
+        ({required String suggestedName}) async =>
+            '${root.path}/exports/$suggestedName';
+    addTearDown(() {
+      export_delivery.chooseExportFileLocation = originalPicker;
+      export_delivery.supportsSaveLocationPicker = originalSupports;
+    });
+
     await tester.pumpWidget(NotesApp(controller: controller));
     await tester.pumpAndSettle();
     controller.selectNote(note.id);
@@ -1383,6 +1399,162 @@ void main() {
       if (await root.exists()) await root.delete(recursive: true);
     });
   });
+
+  testWidgets(
+    'settings backup export writes to the user-chosen save location (desktop)',
+    (tester) async {
+      late Directory root;
+      late AppController controller;
+      await tester.runAsync(() async {
+        root = await Directory.systemTemp.createTemp('notes_export_desk_');
+        controller = _newController(root);
+        await controller.settingsStore.save(
+          const AppSettings(autoLockMinutes: 0),
+        );
+        await controller.init();
+        await controller.createVault('passphrase123');
+        final note = await controller.newNote();
+        await controller.saveNote(note.id, title: 'Secret', body: 'top secret');
+      });
+
+      // Desktop: the user picks the destination via the Save dialog. Stand in
+      // for it with a fixed path inside a folder the OS would have granted.
+      final chosen = Directory('${root.path}/user_picked');
+      final originalPicker = export_delivery.chooseExportFileLocation;
+      final originalSupports = export_delivery.supportsSaveLocationPicker;
+      export_delivery.supportsSaveLocationPicker = true;
+      export_delivery.chooseExportFileLocation =
+          ({required String suggestedName}) async =>
+              '${chosen.path}/$suggestedName';
+      addTearDown(() {
+        export_delivery.chooseExportFileLocation = originalPicker;
+        export_delivery.supportsSaveLocationPicker = originalSupports;
+      });
+
+      await tester.pumpWidget(
+        AppScope(
+          controller: controller,
+          child: const MaterialApp(home: SettingsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Export encrypted backup'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Export encrypted backup'));
+      for (var i = 0;
+          i < 40 && find.text('Encrypted backup saved').evaluate().isEmpty;
+          i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)),
+        );
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+      expect(find.text('Encrypted backup saved'), findsOneWidget);
+
+      // The backup landed in the chosen folder, encrypted (no plaintext).
+      await tester.runAsync(() async {
+        final files = chosen
+            .listSync()
+            .whereType<File>()
+            .where((f) => f.path.endsWith('.notesbak'))
+            .toList();
+        expect(files.length, 1);
+        final contents = await files.single.readAsString();
+        expect(contents.contains('Secret'), isFalse);
+        expect(contents.contains('top secret'), isFalse);
+      });
+
+      controller.dispose();
+      await tester.runAsync(() async {
+        if (await root.exists()) await root.delete(recursive: true);
+      });
+    },
+  );
+
+  testWidgets(
+    'settings backup export is handed to the share sheet (mobile)',
+    (tester) async {
+      late Directory root;
+      late AppController controller;
+      await tester.runAsync(() async {
+        root = await Directory.systemTemp.createTemp('notes_export_mob_');
+        controller = _newController(root);
+        await controller.settingsStore.save(
+          const AppSettings(autoLockMinutes: 0),
+        );
+        await controller.init();
+        await controller.createVault('passphrase123');
+        final note = await controller.newNote();
+        await controller.saveNote(note.id, title: 'Secret', body: 'top secret');
+      });
+
+      // Mobile: no save dialog; the export is staged, shared, then deleted.
+      // Read the staged file inside the share callback (it's gone afterward)
+      // to prove what got handed to the share sheet was encrypted.
+      List<String>? shared;
+      String? sharedContents;
+      final originalSupports = export_delivery.supportsSaveLocationPicker;
+      final originalSharer = export_delivery.shareExportedFiles;
+      export_delivery.supportsSaveLocationPicker = false;
+      export_delivery.shareExportedFiles = (paths, {origin}) async {
+        shared = paths;
+        // Read synchronously: the widget tester's fake-async clock never
+        // completes a real `await` here, and the file is deleted after sharing.
+        sharedContents = File(paths.single).readAsStringSync();
+      };
+      addTearDown(() {
+        export_delivery.supportsSaveLocationPicker = originalSupports;
+        export_delivery.shareExportedFiles = originalSharer;
+      });
+
+      await tester.pumpWidget(
+        AppScope(
+          controller: controller,
+          child: const MaterialApp(home: SettingsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Export encrypted backup'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Export encrypted backup'));
+      for (var i = 0; i < 40 && shared == null; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)),
+        );
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+
+      // Exactly one staged file was shared, its contents were encrypted, and
+      // the staged copy was deleted afterward so nothing lingers on the device.
+      expect(shared, isNotNull);
+      expect(shared!.length, 1);
+      expect(sharedContents, isNotNull);
+      expect(sharedContents!.contains('Secret'), isFalse);
+      expect(sharedContents!.contains('top secret'), isFalse);
+      for (var i = 0; i < 40 && File(shared!.single).existsSync(); i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)),
+        );
+        await tester.pump();
+      }
+      expect(File(shared!.single).existsSync(), isFalse);
+
+      controller.dispose();
+      await tester.runAsync(() async {
+        if (await root.exists()) await root.delete(recursive: true);
+      });
+    },
+  );
 
   testWidgets('vault creation shows a live passphrase-strength meter', (
     tester,
