@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:notes_core/notes_core.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../platform/export_delivery.dart';
 import '../../state/app_scope.dart';
 
 /// Share / export options for a single note: the native share sheet, copy as
@@ -65,6 +68,11 @@ Future<void> showNoteShareSheet(
               'Safe: stays encrypted, needs your passphrase',
             ),
             onTap: () async {
+              // Anchor the share popover (iPad/macOS) before the sheet closes.
+              final box = sheetContext.findRenderObject() as RenderBox?;
+              final origin = box == null || !box.hasSize
+                  ? null
+                  : box.localToGlobal(Offset.zero) & box.size;
               Navigator.of(sheetContext).pop();
               try {
                 if (live != null) {
@@ -74,9 +82,28 @@ Future<void> showNoteShareSheet(
                     body: live.body,
                   );
                 }
-                final file = await controller.exportEncryptedNote(note.id);
-                if (context.mounted) {
-                  await _showExportedPath(context, file.path);
+                if (supportsSaveLocationPicker) {
+                  // Desktop: user picks the destination.
+                  final path = await chooseExportFileLocation(
+                    suggestedName: controller.suggestedNoteFileName(),
+                  );
+                  if (path == null) return; // cancelled
+                  final file = await controller.exportEncryptedNote(
+                    note.id,
+                    target: File(path),
+                  );
+                  if (context.mounted) {
+                    await _showExportedPath(context, file.path);
+                  }
+                } else {
+                  // Mobile: stage privately, hand to the share sheet, then
+                  // delete the staged copy so nothing lingers on the device.
+                  final file = await controller.exportEncryptedNote(note.id);
+                  try {
+                    await shareExportedFiles([file.path], origin: origin);
+                  } finally {
+                    if (await file.exists()) await file.delete();
+                  }
                 }
               } catch (_) {
                 if (context.mounted) {
