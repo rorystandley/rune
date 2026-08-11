@@ -1,0 +1,7 @@
+Choose where your exports go, and reach them afterwards.
+
+* Exports now open the system share sheet, so you can save a backup to Files, another app, or wherever you like.
+* The shared copy is removed from the app once sharing finishes, so nothing lingers on the device.
+* Works for encrypted backups, single-note exports, and the plaintext export.
+
+Still fully offline: no network, no telemetry, no accounts. Not yet audited.

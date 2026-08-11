@@ -6,6 +6,8 @@ All notable changes to Rune are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-08-11
+
 ### Changed
 
 - **You now choose where exports go, and can reach them afterwards.** Exports
@@ -150,7 +152,8 @@ export behind an explicit warning), and local voice-note recording. Fully
 offline — no network, no telemetry, no accounts. On-device transcription
 shipped as a clearly-labelled stub. Not yet audited.
 
-[Unreleased]: https://github.com/rorystandley/rune/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/rorystandley/rune/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/rorystandley/rune/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/rorystandley/rune/releases/tag/v0.5.0
 [0.4.1]: https://github.com/rorystandley/rune/releases/tag/v0.4.1
 [0.4.0]: https://github.com/rorystandley/rune/releases/tag/v0.4.0
