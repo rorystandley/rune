@@ -26,7 +26,11 @@ val whisperReproducibleCompileFlags =
 
 android {
     namespace = "co.rorystandley.notes_app"
-    compileSdk = flutter.compileSdkVersion
+    // flutter_secure_storage requires compiling against Android SDK 37; Flutter's
+    // default compileSdkVersion (36) trips :app:checkReleaseAarMetadata. Compiling
+    // against a higher SDK is backward compatible and does not change minSdk or
+    // targetSdk (runtime behaviour), so the app's supported devices are unchanged.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
