@@ -56,8 +56,8 @@ here, in [RELEASE.md](../RELEASE.md), and in the reproducibility workflow:
 | Flutter SDK | `3.44.2` @ `c9a6c484230f8b5e408ec57be1ef71dee1e77020` (channel `stable`) | `*.yml` env, recipe `srclibs` |
 | Flutter engine | revision `77e2e94772` (hash `04efd7c093d4e9281d5526ebcad6ecc60ba8badf`) | follows the Flutter tag |
 | Dart | `3.12.2` | follows the Flutter tag |
-| Gradle | `9.1.0` | `app/android/gradle/wrapper/gradle-wrapper.properties` |
-| Android Gradle Plugin | `9.0.1` | `app/android/settings.gradle.kts` |
+| Gradle | `9.3.1` | `app/android/gradle/wrapper/gradle-wrapper.properties` |
+| Android Gradle Plugin | `9.1.1` | `app/android/settings.gradle.kts` |
 | Kotlin | `2.3.20` | `app/android/settings.gradle.kts` |
 | Java (JDK) | **17** | `setup-java` in CI; `compileOptions`/`jvmTarget` in `build.gradle.kts` |
 | compileSdk / targetSdk | `36` / `36` | Flutter defaults (3.44.2) |

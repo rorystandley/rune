@@ -1,0 +1,68 @@
+name: F-Droid Android build
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/fdroid.yml'
+      - '.github/workflows/release.yml'
+      - 'app/android/**'
+      - 'app/pubspec.*'
+      - 'native/whisper/**'
+      - 'third_party/whisper.cpp'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fdroid-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  split-apks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install the release Flutter version
+        run: |
+          FLUTTER_VERSION=$(sed -n -E 's/.*FLUTTER_VERSION:.*"([^"]*)".*/\1/p' .github/workflows/release.yml)
+          test -n "$FLUTTER_VERSION"
+          git clone --depth 1 --branch "$FLUTTER_VERSION" \
+            https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Build the F-Droid variants
+        working-directory: app
+        run: |
+          sed -i 's|//f ||' android/app/build.gradle.kts
+          flutter pub get --enforce-lockfile
+          # Let Flutter regenerate release plugin registration; --no-pub after
+          # a fresh pub get can leave integration_test in the registrant.
+          flutter build apk --release --split-per-abi
+          git diff --exit-code -- pubspec.lock
+
+      - name: Verify APK identity and ABI version codes
+        working-directory: app
+        shell: bash
+        run: |
+          set -euo pipefail
+          build=$(sed -n -E 's/^version: .*\+([0-9]+)$/\1/p' pubspec.yaml)
+          test -n "$build"
+          aapt="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          abis=(armeabi-v7a arm64-v8a x86_64)
+          for i in "${!abis[@]}"; do
+            abi="${abis[$i]}"
+            apk="build/app/outputs/flutter-apk/app-$abi-release.apk"
+            expected=$((build * 10 + i + 1))
+            badging=$("$aapt" dump badging "$apk")
+            echo "$badging" | grep -F "package: name='co.rorystandley.rune' versionCode='$expected'"
+            echo "$badging" | grep -Fx "native-code: '$abi'"
+          done
