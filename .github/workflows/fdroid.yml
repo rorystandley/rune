@@ -5,7 +5,7 @@ on:
     paths:
       - '.github/workflows/fdroid.yml'
       - '.github/workflows/release.yml'
-      - 'app/android/**'
+      - 'app/**'
       - 'app/pubspec.*'
       - 'native/whisper/**'
       - 'third_party/whisper.cpp'

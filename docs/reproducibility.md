@@ -12,10 +12,11 @@ what is **not yet** proven — so no claim here outruns the diff that backs it.
 > with a path-varying GNU build-id. Rune now patches the pinned disposable
 > Flutter SDK and package:jni build input before Android release APK builds. A
 > local two-checkout build at different paths reports
-> `IDENTICAL apart from signature: 183 entries match`; the authoritative
-> Linux/JDK 17 GitHub `reproducibility` workflow is also green
-> ([run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978),
-> commit `43c360d`).
+> `IDENTICAL apart from signature: 183 entries match`. The authoritative
+> Linux/JDK 17 GitHub `reproducibility` workflow also passed with the current
+> Gradle 9.3.1, AGP 9.1.1, and compileSdk 37 configuration
+> ([run 34202395088](https://github.com/rorystandley/rune/actions/runs/34202395088),
+> commit `8a5830a`).
 
 ## What "reproducible" has to mean here
 
@@ -60,7 +61,7 @@ here, in [RELEASE.md](../RELEASE.md), and in the reproducibility workflow:
 | Android Gradle Plugin | `9.1.1` | `app/android/settings.gradle.kts` |
 | Kotlin | `2.3.20` | `app/android/settings.gradle.kts` |
 | Java (JDK) | **17** | `setup-java` in CI; `compileOptions`/`jvmTarget` in `build.gradle.kts` |
-| compileSdk / targetSdk | `36` / `36` | Flutter defaults (3.44.2) |
+| compileSdk / targetSdk | `37` / `36` | `app/android/app/build.gradle.kts` / Flutter default |
 | minSdk | `24` | Flutter default (3.44.2) |
 | NDK | `28.2.13676358` | `build.gradle.kts` (`flutter.ndkVersion`), recipe `ndk:` |
 | Build-tools | `36.1.0` | bundled with the pinned AGP/SDK |
@@ -132,9 +133,9 @@ instead of a checkout-specific `file://` URI, and `readelf -n` on
 
 ### Linux/JDK 17 CI proof
 
-The authoritative GitHub Actions gate passed on 2026-06-23:
-[reproducibility run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978)
-(`workflow_dispatch`, commit `43c360d`). It built the same commit in two clean
+The authoritative GitHub Actions gate passed on 2026-09-08:
+[reproducibility run 34202395088](https://github.com/rorystandley/rune/actions/runs/34202395088)
+(`workflow_dispatch`, commit `8a5830a`). It built the same commit in two clean
 Linux checkouts (`a/` and `b/`) and `compare_apks.py` reported all 183
 non-signature entries identical.
 
@@ -146,8 +147,8 @@ run uses Linux/JDK 17):
 | Host | macOS (Darwin 25.5.0), arm64 |
 | Flutter / engine / Dart | `3.44.2` (`c9a6c48423`) / `77e2e94772` / `3.12.2` |
 | JDK | **21.0.9** (Android Studio JBR) — CI and F-Droid use **17** |
-| Gradle / AGP / Kotlin | `9.1.0` / `9.0.1` / `2.3.20` |
-| NDK / build-tools / compileSdk | `28.2.13676358` / `36.1.0` / `36` |
+| Gradle / AGP / Kotlin | `9.3.1` / `9.1.1` / `2.3.20` |
+| NDK / build-tools / compileSdk | `28.2.13676358` / `36.1.0` / `37` |
 | Signing (local) | debug key, v2-only |
 
 ## Residual nondeterminism

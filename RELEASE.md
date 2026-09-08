@@ -256,7 +256,7 @@ in [docs/reproducibility.md](docs/reproducibility.md)):
   Flutter `3.44.2`
   (`c9a6c484230f8b5e408ec57be1ef71dee1e77020`, engine `77e2e94772`, Dart
   `3.12.2`), Gradle `9.3.1`, AGP `9.1.1`, Kotlin `2.3.20`, **Java 17**,
-  compileSdk/targetSdk `36`, minSdk `24`, NDK `28.2.13676358`, build-tools
+  compileSdk/targetSdk `37`/`36`, minSdk `24`, NDK `28.2.13676358`, build-tools
   `36.1.0`.
 - **`SOURCE_DATE_EPOCH`** derived from the tag commit's date, honoured by the
   release archive packaging (deterministic `tar.gz`; normalised mtimes before the
@@ -297,7 +297,7 @@ build-id. After the wrapper fix, a local two-checkout build at different paths
 produced identical APKs:
 `IDENTICAL apart from signature: 183 entries match` (SHA-256
 `4078a084295be6ddb6d3df7bc7d2f49561be4e84e247c4dcea1210c8d45c89cb` for both
-APKs). The Linux/JDK 17 GitHub gate also passed:
-[`reproducibility` run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978)
-on commit `43c360d`. Full detail in
+APKs). The Linux/JDK 17 GitHub gate also passed with the current toolchain:
+[`reproducibility` run 34202395088](https://github.com/rorystandley/rune/actions/runs/34202395088)
+on commit `8a5830a`. Full detail in
 [docs/reproducibility.md](docs/reproducibility.md).
