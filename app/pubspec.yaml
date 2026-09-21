@@ -20,7 +20,7 @@ dependencies:
   # 5.x resolves a stale record_linux that fails to compile on desktop builds.
   record: ^7.1.1
   # Stores the optional cached vault key in the platform credential store.
-  flutter_secure_storage: ^11.0.0
+  flutter_secure_storage: ^11.2.0
   # Drives Face ID / Touch ID / Windows Hello availability checks and prompts.
   local_auth: ^3.0.2
   # Native share sheet for user-initiated single-note sharing. No network of
