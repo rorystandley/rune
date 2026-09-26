@@ -91,6 +91,35 @@ Requires a Play Console account ($25 once).
 4. Listing: screenshots, feature graphic, description, **Data safety** form
    (no data collected/shared), content rating questionnaire.
 
+## F-Droid
+
+The submission is tracked in
+[fdroiddata !41204](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/41204).
+The build recipe lives in the separate fdroiddata repository.
+
+F-Droid builds and signs its own per-ABI APKs. Its recipe enables the
+`//f isMinifyEnabled = true` line in `app/android/app/build.gradle.kts` so R8
+removes unused Play Core classes from Flutter's embedding. Keep this hook when
+updating the Android build configuration.
+
+The split APK version codes are `build * 10 + 1` (armeabi-v7a),
+`build * 10 + 2` (arm64-v8a), and `build * 10 + 3` (x86_64). The universal
+APK and Play app bundle retain the base build number. Keep the split mapping
+in sync with fdroiddata's `VercodeOperation`.
+
+For automatic updates, publish stable `vX.Y.Z` tags with an increasing build
+number in `app/pubspec.yaml`. Keep Flutter pinned in
+`.github/workflows/release.yml` and commit `app/pubspec.lock`. The recipe must
+initialize the pinned `third_party/whisper.cpp` submodule; the bundled model's
+source, checksum, and license are documented in
+[docs/transcription.md](docs/transcription.md#pinned-inputs).
+
+Before submitting a recipe update, run `fdroid checkupdates --auto`,
+`fdroid rewritemeta`, and `fdroid lint` for `co.rorystandley.rune`, then verify
+the F-Droid Linux build and APK scanner pass for all three ABIs. This is
+separate from the upstream reproducibility check: F-Droid's source-signed
+APKs do not use the upstream signing key.
+
 ## macOS
 
 - Mac App Store: enable Hardened Runtime, sign with a Mac App Store provisioning
@@ -226,8 +255,8 @@ in [docs/reproducibility.md](docs/reproducibility.md)):
 - **Pinned build inputs**, recorded here and in the `reproducibility` workflow:
   Flutter `3.44.2`
   (`c9a6c484230f8b5e408ec57be1ef71dee1e77020`, engine `77e2e94772`, Dart
-  `3.12.2`), Gradle `9.1.0`, AGP `9.0.1`, Kotlin `2.3.20`, **Java 17**,
-  compileSdk/targetSdk `36`, minSdk `24`, NDK `28.2.13676358`, build-tools
+  `3.12.2`), Gradle `9.3.1`, AGP `9.1.1`, Kotlin `2.3.20`, **Java 17**,
+  compileSdk/targetSdk `37`/`36`, minSdk `24`, NDK `28.2.13676358`, build-tools
   `36.1.0`.
 - **`SOURCE_DATE_EPOCH`** derived from the tag commit's date, honoured by the
   release archive packaging (deterministic `tar.gz`; normalised mtimes before the
@@ -268,7 +297,7 @@ build-id. After the wrapper fix, a local two-checkout build at different paths
 produced identical APKs:
 `IDENTICAL apart from signature: 183 entries match` (SHA-256
 `4078a084295be6ddb6d3df7bc7d2f49561be4e84e247c4dcea1210c8d45c89cb` for both
-APKs). The Linux/JDK 17 GitHub gate also passed:
-[`reproducibility` run 28019115978](https://github.com/rorystandley/rune/actions/runs/28019115978)
-on commit `43c360d`. Full detail in
+APKs). The Linux/JDK 17 GitHub gate also passed with the current toolchain:
+[`reproducibility` run 34202395088](https://github.com/rorystandley/rune/actions/runs/34202395088)
+on commit `8a5830a`. Full detail in
 [docs/reproducibility.md](docs/reproducibility.md).
