@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_auth/local_auth.dart';
@@ -220,6 +221,39 @@ void main() {
 
       expect(events, ['write']);
     });
+
+    test(
+      'clearing the cache is a no-op when no biometric is enrolled',
+      () async {
+        final storage = FakeSecureStorage(
+          deleteError: PlatformException(
+            code: 'Exception encountered',
+            message:
+                'java.lang.IllegalStateException: At least one biometric must '
+                'be enrolled to create keys requiring user authentication for '
+                'every use',
+          ),
+        );
+        final store = buildStore(TargetPlatform.android, storage: storage);
+
+        await store.clearCachedDek();
+      },
+    );
+
+    test('unrelated secure-storage failures still surface', () async {
+      final storage = FakeSecureStorage(
+        deleteError: PlatformException(
+          code: 'Exception encountered',
+          message: 'disk full',
+        ),
+      );
+      final store = buildStore(TargetPlatform.android, storage: storage);
+
+      await expectLater(
+        store.clearCachedDek(),
+        throwsA(isA<PlatformException>()),
+      );
+    });
   });
 }
 
@@ -283,10 +317,11 @@ class FakeLocalAuthentication extends LocalAuthentication {
 }
 
 class FakeSecureStorage extends FlutterSecureStorage {
-  FakeSecureStorage({this.events});
+  FakeSecureStorage({this.events, this.deleteError});
 
   final Map<String, String> values = {};
   final List<String>? events;
+  final Object? deleteError;
 
   @override
   Future<void> write({
@@ -332,6 +367,7 @@ class FakeSecureStorage extends FlutterSecureStorage {
     WindowsOptions? wOptions,
   }) async {
     events?.add('delete');
+    if (deleteError != null) throw deleteError!;
     values.remove(key);
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/platform/audio_recorder.dart';
 import 'package:notes_app/platform/biometric_unlock_store.dart';
@@ -61,6 +62,38 @@ void main() {
     expect(controller.phase, AppPhase.unlocked);
     expect(controller.visibleNotes, isEmpty);
   });
+
+  test(
+    'createVault still unlocks when biometric storage has no enrolled credential',
+    () async {
+      controller.dispose();
+      controller = await buildController(
+        biometricUnlockStore: _NoBiometricKeystore(),
+      );
+
+      await controller.createVault('passphrase123');
+
+      expect(controller.phase, AppPhase.unlocked);
+      expect(controller.settings.biometricUnlockEnabled, isFalse);
+      expect(controller.biometricUnlockReady, isFalse);
+    },
+  );
+
+  test(
+    'createVault opens the unlock screen when the vault file already exists',
+    () async {
+      await controller.vault.createVault(
+        'passphrase123',
+        kdfParams: controller.createKdfParams,
+      );
+
+      await controller.createVault('a-different-attempt');
+
+      expect(controller.phase, AppPhase.locked);
+      expect(await controller.unlock('passphrase123'), isTrue);
+      expect(controller.phase, AppPhase.unlocked);
+    },
+  );
 
   test('create, save, search, and delete a note', () async {
     await controller.createVault('passphrase123');
@@ -556,6 +589,27 @@ class _ThrowingSettingsStore extends SettingsStore {
   Future<void> save(AppSettings settings) async {
     if (failSaves) throw Exception('simulated settings write failure');
     return super.save(settings);
+  }
+}
+
+/// Simulates Android Keystore refusing to open biometric-bound storage when
+/// no credential is enrolled — the failure `FlutterSecureStorage.delete` raises
+/// during first-run vault creation.
+class _NoBiometricKeystore extends MemoryBiometricUnlockStore {
+  @override
+  Future<BiometricUnlockAvailability> checkAvailability() async =>
+      const BiometricUnlockAvailability.unavailable(
+        'No biometric credential is enrolled on this device.',
+      );
+
+  @override
+  Future<void> clearCachedDek() async {
+    throw PlatformException(
+      code: 'Exception encountered',
+      message:
+          'java.lang.IllegalStateException: At least one biometric must be '
+          'enrolled to create keys requiring user authentication for every use',
+    );
   }
 }
 

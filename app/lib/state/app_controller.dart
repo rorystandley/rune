@@ -117,8 +117,38 @@ class AppController extends ChangeNotifier {
     try {
       await vault.createVault(passphrase, kdfParams: createKdfParams);
       await repo.loadAll();
-      await _disableBiometricUnlock(saveSettings: true);
+      // A new vault has no biometric cache. Opening the biometric-bound
+      // keystore still throws on devices with no enrolled credential
+      // ("At least one biometric must be enrolled"), including from delete.
+      // That used to escape after vault.json was written, so the next tap
+      // threw VaultAlreadyExistsException and the create screen never left.
+      try {
+        await _disableBiometricUnlock(saveSettings: true);
+      } catch (_) {
+        _settings = _settings.copyWith(
+          biometricUnlockEnabled: false,
+          biometricUnlockVaultBinding: null,
+        );
+        _biometricUnlockReady = false;
+        try {
+          await settingsStore.save(_settings);
+        } catch (_) {
+          // The vault is already usable if this preference write fails.
+        }
+      }
       _enterUnlocked();
+    } on VaultAlreadyExistsException {
+      // The vault file is already on disk — often because an earlier attempt
+      // in this session wrote it and then failed while touching biometric
+      // storage. Drop the in-memory session and let the unlock screen open it.
+      repo.clear();
+      vault.lock();
+      _selectedId = null;
+      _search = '';
+      _unlockError = null;
+      _biometricUnlockError = null;
+      _phase = AppPhase.locked;
+      notifyListeners();
     } finally {
       _setBusy(false);
     }
