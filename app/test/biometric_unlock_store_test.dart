@@ -1,8 +1,14 @@
-import 'package:flutter/foundation.dart';
+import 'dart:io';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:notes_app/platform/audio_recorder.dart';
 import 'package:notes_app/platform/biometric_unlock_store.dart';
+import 'package:notes_app/state/app_controller.dart';
+import 'package:notes_app/state/app_settings.dart';
+import 'package:notes_core/notes_core.dart';
 
 void main() {
   group('platform availability', () {
@@ -220,7 +226,220 @@ void main() {
 
       expect(events, ['write']);
     });
+
+    test(
+      'clearing the cache is a no-op when no biometric is enrolled',
+      () async {
+        final storage = FakeSecureStorage(
+          deleteError: PlatformException(
+            code: 'Exception encountered',
+            message:
+                'java.lang.IllegalStateException: At least one biometric must '
+                'be enrolled to create keys requiring user authentication for '
+                'every use',
+          ),
+        );
+        final store = buildStore(TargetPlatform.android, storage: storage);
+
+        await store.clearCachedDek();
+      },
+    );
+
+    for (final (platform, error) in [
+      (
+        TargetPlatform.android,
+        PlatformException(
+          code: 'KeystoreError',
+          message: 'BIOMETRIC credential NOT ENROLLED',
+        ),
+      ),
+      (
+        TargetPlatform.iOS,
+        PlatformException(code: 'LAErrorBiometryNotEnrolled'),
+      ),
+      (
+        TargetPlatform.macOS,
+        PlatformException(code: 'KeychainError', message: 'Biometry not enrolled'),
+      ),
+      (
+        TargetPlatform.android,
+        PlatformException(
+          code: 'KeystoreError',
+          details: 'At least one biometric must be enrolled',
+        ),
+      ),
+    ]) {
+      test('clear tolerates missing enrollment on ${platform.name}: $error',
+          () async {
+        final events = <String>[];
+        final storage = FakeSecureStorage(events: events, deleteError: error);
+        final store = buildStore(
+          platform,
+          auth: FakeLocalAuthentication(events: events),
+          storage: storage,
+        );
+
+        await expectLater(store.clearCachedDek(), completes);
+
+        // Cleanup must attempt deletion without prompting or creating a key.
+        expect(events, ['delete']);
+        expect(storage.values, isEmpty);
+      });
+    }
+
+    for (final error in <Object>[
+      PlatformException(code: 'BiometryNotAvailable'),
+      PlatformException(code: 'BiometryLockout'),
+      PlatformException(code: 'UserCanceled', message: 'Biometric canceled'),
+      PlatformException(code: 'NotEnrolled', message: 'Device not enrolled'),
+      PlatformException(code: 'PolicyError', message: 'Device must be enrolled'),
+      StateError('secure storage unavailable'),
+    ]) {
+      test('clear preserves the cache and rethrows the original error: $error',
+          () async {
+        final events = <String>[];
+        final storage = FakeSecureStorage(events: events, deleteError: error);
+        final store = buildStore(TargetPlatform.android, storage: storage);
+        await store.saveCachedDek(
+          vaultBinding: 'vault-a',
+          dek: Uint8List.fromList([1, 2, 3]),
+        );
+        final cachedValues = Map<String, String>.of(storage.values);
+        events.clear();
+
+        await expectLater(store.clearCachedDek(), throwsA(same(error)));
+
+        expect(events, ['delete']);
+        expect(storage.values, cachedValues);
+      });
+    }
+
+    test('clear deletes only the cached DEK and is safe to repeat', () async {
+      final events = <String>[];
+      final storage = FakeSecureStorage(events: events)
+        ..values['unrelated-key'] = 'keep';
+      final store = buildStore(TargetPlatform.android, storage: storage);
+      await store.saveCachedDek(
+        vaultBinding: 'vault-a',
+        dek: Uint8List.fromList([1, 2, 3]),
+      );
+      expect(storage.values, hasLength(2));
+      events.clear();
+
+      await store.clearCachedDek();
+      await store.clearCachedDek();
+
+      expect(events, ['delete', 'delete']);
+      expect(storage.values, {'unrelated-key': 'keep'});
+      expect(await store.readCachedDek(vaultBinding: 'vault-a'), isNull);
+    });
+
+    test('unrelated secure-storage failures still surface', () async {
+      final storage = FakeSecureStorage(
+        deleteError: PlatformException(
+          code: 'Exception encountered',
+          message: 'disk full',
+        ),
+      );
+      final store = buildStore(TargetPlatform.android, storage: storage);
+
+      await expectLater(
+        store.clearCachedDek(),
+        throwsA(isA<PlatformException>()),
+      );
+    });
+
+    test(
+      'hardware unavailability is not treated as missing enrolment',
+      () async {
+        final storage = FakeSecureStorage(
+          deleteError: PlatformException(
+            code: 'Exception encountered',
+            message:
+                'Biometric authentication error: Fingerprint hardware not '
+                'available.',
+          ),
+        );
+        final store = buildStore(TargetPlatform.android, storage: storage);
+
+        await expectLater(
+          store.clearCachedDek(),
+          throwsA(isA<PlatformException>()),
+        );
+      },
+    );
   });
+
+  for (final message in [
+    'Biometric hardware is not available',
+    'Biometric hardware NotAvailable',
+  ]) {
+    test(
+      'disableBiometricUnlock propagates hardware failure: $message',
+      () async {
+        final root = await Directory.systemTemp.createTemp(
+          'biometric_unlock_test_',
+        );
+        addTearDown(() => root.delete(recursive: true));
+        final error = PlatformException(
+          code: 'HardwareUnavailable',
+          message: message,
+        );
+        final events = <String>[];
+        final storage = FakeSecureStorage(events: events, deleteError: error);
+        final store = buildStore(
+          TargetPlatform.android,
+          auth: FakeLocalAuthentication(
+            canCheckBiometricsResult: true,
+            enrolledBiometrics: const [BiometricType.strong],
+          ),
+          storage: storage,
+        );
+        final settings = SettingsStore(File('${root.path}/settings.json'));
+        await settings.save(const AppSettings(autoLockMinutes: 0));
+        final controller = AppController(
+          vaultDir: Directory('${root.path}/vault'),
+          audioTempDir: Directory('${root.path}/audio'),
+          exportsDir: Directory('${root.path}/exports'),
+          settingsStore: settings,
+          transcription: const StubTranscriptionService(),
+          recorder: const UnavailableAudioRecorder(),
+          biometricUnlockStore: store,
+          createKdfParams: CryptoService().newKdfParams(
+            memoryKiB: 256,
+            iterations: 1,
+            parallelism: 1,
+          ),
+        );
+        addTearDown(controller.dispose);
+        await controller.init();
+        await controller.createVault('passphrase123');
+        expect(await controller.enableBiometricUnlock(), isTrue);
+        expect(controller.biometricUnlockReady, isTrue);
+        final enabledSettings = controller.settings;
+        final savedSettings = await settings.file.readAsString();
+        final cachedValues = Map<String, String>.of(storage.values);
+        expect(cachedValues, isNotEmpty);
+        events.clear();
+        var notifications = 0;
+        controller.addListener(() => notifications++);
+
+        await expectLater(
+          controller.disableBiometricUnlock(),
+          throwsA(same(error)),
+        );
+
+        expect(events, ['delete']);
+        expect(storage.values, cachedValues);
+        expect(controller.settings, same(enabledSettings));
+        expect(controller.settings.biometricUnlockEnabled, isTrue);
+        expect(controller.biometricUnlockReady, isTrue);
+        expect(await settings.file.readAsString(), savedSettings);
+        expect((await settings.load()).biometricUnlockEnabled, isTrue);
+        expect(notifications, 0);
+      },
+    );
+  }
 }
 
 PlatformBiometricUnlockStore buildStore(
@@ -283,10 +502,11 @@ class FakeLocalAuthentication extends LocalAuthentication {
 }
 
 class FakeSecureStorage extends FlutterSecureStorage {
-  FakeSecureStorage({this.events});
+  FakeSecureStorage({this.events, this.deleteError});
 
   final Map<String, String> values = {};
   final List<String>? events;
+  final Object? deleteError;
 
   @override
   Future<void> write({
@@ -332,6 +552,7 @@ class FakeSecureStorage extends FlutterSecureStorage {
     WindowsOptions? wOptions,
   }) async {
     events?.add('delete');
+    if (deleteError != null) throw deleteError!;
     values.remove(key);
   }
 }

@@ -6,6 +6,16 @@ All notable changes to Rune are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- Creating a vault on a device with no enrolled biometric no longer crashes.
+  Android Keystore (and the equivalent iOS/macOS keychain error) refuses to
+  open biometric-bound secure storage even to delete a cache that was never
+  written. That abort happened after `vault.json` existed, so the next attempt
+  failed with "a vault already exists" and setup could not finish. Vault
+  creation now completes without a biometric, and a retry opens the passphrase
+  unlock screen instead of failing again.
+
 ## [0.5.1] - 2026-08-11
 
 ### Changed

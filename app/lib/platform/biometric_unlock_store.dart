@@ -174,7 +174,19 @@ class PlatformBiometricUnlockStore implements BiometricUnlockStore {
   }
 
   @override
-  Future<void> clearCachedDek() => _storage.delete(key: _cacheKey);
+  Future<void> clearCachedDek() async {
+    try {
+      await _storage.delete(key: _cacheKey);
+    } catch (error) {
+      // Android Keystore throws IllegalStateException ("At least one biometric
+      // must be enrolled") while *opening* a biometric-bound store, including
+      // a delete of a key that was never written. iOS/macOS report the same
+      // condition as biometry-not-enrolled. There is nothing to clear, and
+      // callers (notably first-run vault creation) must not treat that as a
+      // failure. Any other storage error still propagates.
+      if (!_isMissingBiometricEnrollment(error)) rethrow;
+    }
+  }
 
   Future<BiometricUnlockAvailability> _mobileBiometricAvailability({
     required String label,
@@ -224,4 +236,19 @@ class BiometricUnlockException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// True when [error] is the platform refusing to open biometric-bound secure
+/// storage because no biometric credential is enrolled.
+///
+/// Hardware failures ("Fingerprint hardware not available") are not this case:
+/// a cached key may still exist, so the error must propagate.
+bool _isMissingBiometricEnrollment(Object error) {
+  final text = error.toString().toLowerCase();
+  final mentionsBiometry =
+      text.contains('biometric') || text.contains('biometry');
+  if (!mentionsBiometry) return false;
+  return text.contains('must be enrolled') ||
+      text.contains('not enrolled') ||
+      text.contains('notenrolled');
 }
