@@ -30,7 +30,13 @@ android {
     // default compileSdkVersion (36) trips :app:checkReleaseAarMetadata. Compiling
     // against a higher SDK is backward compatible and does not change minSdk or
     // targetSdk (runtime behaviour), so the app's supported devices are unchanged.
-    compileSdk = 37
+    // SDK 37 ships as platform "android-37.0"; name the minor version so Gradle
+    // finds it after auto-installing it (a bare 37 looks for "android-37").
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 0
+        }
+    }
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
