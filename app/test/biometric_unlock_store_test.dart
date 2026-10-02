@@ -245,6 +245,95 @@ void main() {
       },
     );
 
+    for (final (platform, error) in [
+      (
+        TargetPlatform.android,
+        PlatformException(
+          code: 'KeystoreError',
+          message: 'BIOMETRIC credential NOT ENROLLED',
+        ),
+      ),
+      (
+        TargetPlatform.iOS,
+        PlatformException(code: 'LAErrorBiometryNotEnrolled'),
+      ),
+      (
+        TargetPlatform.macOS,
+        PlatformException(code: 'KeychainError', message: 'Biometry not enrolled'),
+      ),
+      (
+        TargetPlatform.android,
+        PlatformException(
+          code: 'KeystoreError',
+          details: 'At least one biometric must be enrolled',
+        ),
+      ),
+    ]) {
+      test('clear tolerates missing enrollment on ${platform.name}: $error',
+          () async {
+        final events = <String>[];
+        final storage = FakeSecureStorage(events: events, deleteError: error);
+        final store = buildStore(
+          platform,
+          auth: FakeLocalAuthentication(events: events),
+          storage: storage,
+        );
+
+        await expectLater(store.clearCachedDek(), completes);
+
+        // Cleanup must attempt deletion without prompting or creating a key.
+        expect(events, ['delete']);
+        expect(storage.values, isEmpty);
+      });
+    }
+
+    for (final error in <Object>[
+      PlatformException(code: 'BiometryNotAvailable'),
+      PlatformException(code: 'BiometryLockout'),
+      PlatformException(code: 'UserCanceled', message: 'Biometric canceled'),
+      PlatformException(code: 'NotEnrolled', message: 'Device not enrolled'),
+      PlatformException(code: 'PolicyError', message: 'Device must be enrolled'),
+      StateError('secure storage unavailable'),
+    ]) {
+      test('clear preserves the cache and rethrows the original error: $error',
+          () async {
+        final events = <String>[];
+        final storage = FakeSecureStorage(events: events, deleteError: error);
+        final store = buildStore(TargetPlatform.android, storage: storage);
+        await store.saveCachedDek(
+          vaultBinding: 'vault-a',
+          dek: Uint8List.fromList([1, 2, 3]),
+        );
+        final cachedValues = Map<String, String>.of(storage.values);
+        events.clear();
+
+        await expectLater(store.clearCachedDek(), throwsA(same(error)));
+
+        expect(events, ['delete']);
+        expect(storage.values, cachedValues);
+      });
+    }
+
+    test('clear deletes only the cached DEK and is safe to repeat', () async {
+      final events = <String>[];
+      final storage = FakeSecureStorage(events: events)
+        ..values['unrelated-key'] = 'keep';
+      final store = buildStore(TargetPlatform.android, storage: storage);
+      await store.saveCachedDek(
+        vaultBinding: 'vault-a',
+        dek: Uint8List.fromList([1, 2, 3]),
+      );
+      expect(storage.values, hasLength(2));
+      events.clear();
+
+      await store.clearCachedDek();
+      await store.clearCachedDek();
+
+      expect(events, ['delete', 'delete']);
+      expect(storage.values, {'unrelated-key': 'keep'});
+      expect(await store.readCachedDek(vaultBinding: 'vault-a'), isNull);
+    });
+
     test('unrelated secure-storage failures still surface', () async {
       final storage = FakeSecureStorage(
         deleteError: PlatformException(
