@@ -1,0 +1,7 @@
+Vault setup works on devices without a fingerprint or face unlock.
+
+* Creating a vault no longer fails when no biometric is enrolled.
+* If a vault was already created, Rune opens the passphrase screen instead of getting stuck.
+* Biometric unlock stays off until you turn it on.
+
+Still fully offline: no network, no telemetry, no accounts. Not yet audited.
