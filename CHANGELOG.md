@@ -6,6 +6,15 @@ All notable changes to Rune are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-10-02
+
+### Fixed
+
+- Android builds that auto-install SDK platform 37 (F-Droid's build server)
+  no longer fail with "Failed to find target with hash string 'android-37'".
+  `compileSdk` now names the platform as 37.0, matching the directory the SDK
+  manager creates.
+
 ## [0.5.4] - 2026-10-02
 
 ### Fixed
@@ -181,7 +190,8 @@ export behind an explicit warning), and local voice-note recording. Fully
 offline — no network, no telemetry, no accounts. On-device transcription
 shipped as a clearly-labelled stub. Not yet audited.
 
-[Unreleased]: https://github.com/rorystandley/rune/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/rorystandley/rune/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/rorystandley/rune/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/rorystandley/rune/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/rorystandley/rune/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/rorystandley/rune/compare/v0.5.1...v0.5.2
