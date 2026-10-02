@@ -76,8 +76,12 @@ android {
             }
         }
 
-        ndk {
-            abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64"))
+        // Gradle rejects abiFilters alongside ABI splits, so leave them to the
+        // Flutter plugin when building with --split-per-abi (F-Droid).
+        if (!project.hasProperty("split-per-abi")) {
+            ndk {
+                abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64"))
+            }
         }
     }
 
