@@ -253,6 +253,26 @@ void main() {
         throwsA(isA<PlatformException>()),
       );
     });
+
+    test(
+      'hardware unavailability is not treated as missing enrolment',
+      () async {
+        final storage = FakeSecureStorage(
+          deleteError: PlatformException(
+            code: 'Exception encountered',
+            message:
+                'Biometric authentication error: Fingerprint hardware not '
+                'available.',
+          ),
+        );
+        final store = buildStore(TargetPlatform.android, storage: storage);
+
+        await expectLater(
+          store.clearCachedDek(),
+          throwsA(isA<PlatformException>()),
+        );
+      },
+    );
   });
 }
 

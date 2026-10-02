@@ -240,6 +240,9 @@ class BiometricUnlockException implements Exception {
 
 /// True when [error] is the platform refusing to open biometric-bound secure
 /// storage because no biometric credential is enrolled.
+///
+/// Hardware failures ("Fingerprint hardware not available") are not this case:
+/// a cached key may still exist, so the error must propagate.
 bool _isMissingBiometricEnrollment(Object error) {
   final text = error.toString().toLowerCase();
   final mentionsBiometry =
@@ -247,7 +250,5 @@ bool _isMissingBiometricEnrollment(Object error) {
   if (!mentionsBiometry) return false;
   return text.contains('must be enrolled') ||
       text.contains('not enrolled') ||
-      text.contains('notenrolled') ||
-      text.contains('not available') ||
-      text.contains('notavailable');
+      text.contains('notenrolled');
 }

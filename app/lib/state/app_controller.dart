@@ -113,6 +113,11 @@ class AppController extends ChangeNotifier {
   // ---------------------------------------------------------------- vault ---
 
   Future<void> createVault(String passphrase) async {
+    // Keyboard submit on the create screen does not check [busy]. A second
+    // call while the first is still clearing biometric storage would see the
+    // vault file, take the already-exists path, and lock the session the
+    // first call is about to publish as unlocked.
+    if (_busy) return;
     _setBusy(true);
     try {
       await vault.createVault(passphrase, kdfParams: createKdfParams);

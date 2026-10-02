@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -249,6 +250,53 @@ void main() {
     expect(controller.settings.biometricUnlockEnabled, isFalse);
     expect(controller.canUnlockWithBiometric, isFalse);
   });
+
+  test(
+    'disableBiometricUnlock keeps the cache when hardware is unavailable',
+    () async {
+      final biometrics = _HardwareFailureBiometricStore();
+      final settingsFile = File('${root.path}/hw-settings.json');
+      controller.dispose();
+      controller = await buildController(
+        biometricUnlockStore: biometrics,
+        settingsStore: SettingsStore(settingsFile),
+      );
+
+      await controller.createVault('passphrase123');
+      expect(await controller.enableBiometricUnlock(), isTrue);
+      expect(biometrics.hasCachedDek, isTrue);
+      final saved = await settingsFile.readAsString();
+
+      await expectLater(
+        controller.disableBiometricUnlock(),
+        throwsA(isA<PlatformException>()),
+      );
+
+      expect(biometrics.hasCachedDek, isTrue);
+      expect(controller.settings.biometricUnlockEnabled, isTrue);
+      expect(await settingsFile.readAsString(), saved);
+    },
+  );
+
+  test(
+    'a second createVault while the first is in flight does not lock the vault',
+    () async {
+      final biometrics = _GatedClearStore();
+      controller.dispose();
+      controller = await buildController(biometricUnlockStore: biometrics);
+
+      final first = controller.createVault('passphrase123');
+      await biometrics.started.future.timeout(const Duration(seconds: 5));
+      final second = controller.createVault('other-passphrase');
+      biometrics.release();
+      await Future.wait([first, second]);
+
+      expect(controller.phase, AppPhase.unlocked);
+      expect(controller.vault.isUnlocked, isTrue);
+      final note = await controller.newNote();
+      expect(controller.visibleNotes.single.id, note.id);
+    },
+  );
 
   test(
     'passphrase change keeps enabled biometric unlock bound to new header',
@@ -609,6 +657,35 @@ class _NoBiometricKeystore extends MemoryBiometricUnlockStore {
           'java.lang.IllegalStateException: At least one biometric must be '
           'enrolled to create keys requiring user authentication for every use',
     );
+  }
+}
+
+class _HardwareFailureBiometricStore extends MemoryBiometricUnlockStore {
+  @override
+  Future<void> clearCachedDek() async {
+    throw PlatformException(
+      code: 'Exception encountered',
+      message:
+          'Biometric authentication error: Fingerprint hardware not available.',
+    );
+  }
+}
+
+/// Blocks the first cache clear so a second [AppController.createVault] can
+/// overlap with it.
+class _GatedClearStore extends MemoryBiometricUnlockStore {
+  final started = Completer<void>();
+  final _gate = Completer<void>();
+
+  void release() {
+    if (!_gate.isCompleted) _gate.complete();
+  }
+
+  @override
+  Future<void> clearCachedDek() async {
+    if (!started.isCompleted) started.complete();
+    await _gate.future;
+    await super.clearCachedDek();
   }
 }
 
