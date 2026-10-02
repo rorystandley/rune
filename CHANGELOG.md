@@ -6,6 +6,14 @@ All notable changes to Rune are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-10-02
+
+### Fixed
+
+- Regenerated app/pubspec.lock with Flutter 3.44.2. F-Droid's
+  `flutter pub get --enforce-lockfile` rejected the 0.5.2 lockfile because
+  matcher, meta, test_api, and vector_math were pinned by a newer SDK.
+
 ## [0.5.2] - 2026-10-02
 
 ### Fixed
@@ -164,7 +172,8 @@ export behind an explicit warning), and local voice-note recording. Fully
 offline — no network, no telemetry, no accounts. On-device transcription
 shipped as a clearly-labelled stub. Not yet audited.
 
-[Unreleased]: https://github.com/rorystandley/rune/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/rorystandley/rune/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/rorystandley/rune/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/rorystandley/rune/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/rorystandley/rune/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/rorystandley/rune/releases/tag/v0.5.0
