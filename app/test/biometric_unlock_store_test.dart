@@ -1,8 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:notes_app/platform/audio_recorder.dart';
 import 'package:notes_app/platform/biometric_unlock_store.dart';
+import 'package:notes_app/state/app_controller.dart';
+import 'package:notes_app/state/app_settings.dart';
+import 'package:notes_core/notes_core.dart';
 
 void main() {
   group('platform availability', () {
@@ -274,6 +280,77 @@ void main() {
       },
     );
   });
+
+  for (final message in [
+    'Biometric hardware is not available',
+    'Biometric hardware NotAvailable',
+  ]) {
+    test(
+      'disableBiometricUnlock propagates hardware failure: $message',
+      () async {
+        final root = await Directory.systemTemp.createTemp(
+          'biometric_unlock_test_',
+        );
+        addTearDown(() => root.delete(recursive: true));
+        final error = PlatformException(
+          code: 'HardwareUnavailable',
+          message: message,
+        );
+        final events = <String>[];
+        final storage = FakeSecureStorage(events: events, deleteError: error);
+        final store = buildStore(
+          TargetPlatform.android,
+          auth: FakeLocalAuthentication(
+            canCheckBiometricsResult: true,
+            enrolledBiometrics: const [BiometricType.strong],
+          ),
+          storage: storage,
+        );
+        final settings = SettingsStore(File('${root.path}/settings.json'));
+        await settings.save(const AppSettings(autoLockMinutes: 0));
+        final controller = AppController(
+          vaultDir: Directory('${root.path}/vault'),
+          audioTempDir: Directory('${root.path}/audio'),
+          exportsDir: Directory('${root.path}/exports'),
+          settingsStore: settings,
+          transcription: const StubTranscriptionService(),
+          recorder: const UnavailableAudioRecorder(),
+          biometricUnlockStore: store,
+          createKdfParams: CryptoService().newKdfParams(
+            memoryKiB: 256,
+            iterations: 1,
+            parallelism: 1,
+          ),
+        );
+        addTearDown(controller.dispose);
+        await controller.init();
+        await controller.createVault('passphrase123');
+        expect(await controller.enableBiometricUnlock(), isTrue);
+        expect(controller.biometricUnlockReady, isTrue);
+        final enabledSettings = controller.settings;
+        final savedSettings = await settings.file.readAsString();
+        final cachedValues = Map<String, String>.of(storage.values);
+        expect(cachedValues, isNotEmpty);
+        events.clear();
+        var notifications = 0;
+        controller.addListener(() => notifications++);
+
+        await expectLater(
+          controller.disableBiometricUnlock(),
+          throwsA(same(error)),
+        );
+
+        expect(events, ['delete']);
+        expect(storage.values, cachedValues);
+        expect(controller.settings, same(enabledSettings));
+        expect(controller.settings.biometricUnlockEnabled, isTrue);
+        expect(controller.biometricUnlockReady, isTrue);
+        expect(await settings.file.readAsString(), savedSettings);
+        expect((await settings.load()).biometricUnlockEnabled, isTrue);
+        expect(notifications, 0);
+      },
+    );
+  }
 }
 
 PlatformBiometricUnlockStore buildStore(
