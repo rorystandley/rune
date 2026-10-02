@@ -6,6 +6,15 @@ All notable changes to Rune are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-10-02
+
+### Fixed
+
+- Android builds with `--split-per-abi` no longer fail with "Conflicting
+  configuration : 'armeabi-v7a,arm64-v8a,x86_64' in ndk abiFilters cannot be
+  present when splits abi filters are set". The app's `abiFilters` are now
+  applied only when ABI splits are off. This unblocks the F-Droid build.
+
 ## [0.5.3] - 2026-10-02
 
 ### Fixed
@@ -172,7 +181,8 @@ export behind an explicit warning), and local voice-note recording. Fully
 offline — no network, no telemetry, no accounts. On-device transcription
 shipped as a clearly-labelled stub. Not yet audited.
 
-[Unreleased]: https://github.com/rorystandley/rune/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/rorystandley/rune/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/rorystandley/rune/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/rorystandley/rune/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/rorystandley/rune/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/rorystandley/rune/compare/v0.5.0...v0.5.1
