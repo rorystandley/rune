@@ -6,6 +6,17 @@ All notable changes to Rune are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-10-02
+
+### Fixed
+
+- Split-per-ABI Android builds (F-Droid) now get the version codes F-Droid
+  expects: base versionCode * 10 + 1 (armeabi-v7a), 2 (arm64-v8a) or 3
+  (x86_64). Universal APKs and the Play app bundle keep the base code.
+- F-Droid's recipe can again enable R8 through the `//f` marker in
+  `build.gradle.kts` to strip Flutter's unused Play Core classes. Default
+  builds are unchanged.
+
 ## [0.5.5] - 2026-10-02
 
 ### Fixed
@@ -190,7 +201,8 @@ export behind an explicit warning), and local voice-note recording. Fully
 offline — no network, no telemetry, no accounts. On-device transcription
 shipped as a clearly-labelled stub. Not yet audited.
 
-[Unreleased]: https://github.com/rorystandley/rune/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/rorystandley/rune/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/rorystandley/rune/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/rorystandley/rune/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/rorystandley/rune/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/rorystandley/rune/compare/v0.5.2...v0.5.3
