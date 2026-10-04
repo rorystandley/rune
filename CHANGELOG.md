@@ -8,6 +8,8 @@ All notable changes to Rune are documented here. The format is based on
 
 ### Changed
 
+- The licence is now stated explicitly as `GPL-3.0-or-later` (GPL version 3 or,
+  at your option, any later version) in the README and CONTRIBUTING.
 - Android no longer opts in to system backups (`android:allowBackup="false"`),
   so app-private files stay out of device transfers and cloud backups. Use the
   encrypted export to back up your notes.

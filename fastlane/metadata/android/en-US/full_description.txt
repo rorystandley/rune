@@ -29,7 +29,7 @@ What you can do:
   behind an explicit warning.
 * Capture voice notes — recording stays entirely on your device.
 
-Free and open source under the GNU GPLv3. The security-critical code is a small,
+Free and open source under the GNU GPL, version 3 or later. The security-critical code is a small,
 dependency-light, pure-Dart core so it can be read and audited. Releases published on
 GitHub ship with cryptographic provenance (SLSA build-provenance attestations
 and a keyless cosign signature) so you can verify those binaries were built from
