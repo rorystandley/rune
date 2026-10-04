@@ -6,6 +6,8 @@ All notable changes to Rune are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-10-04
+
 ### Changed
 
 - The licence is now stated explicitly as `GPL-3.0-or-later` (GPL version 3 or,
@@ -20,8 +22,8 @@ All notable changes to Rune are documented here. The format is based on
 
 ### Fixed
 
-- Added F-Droid changelogs for the per-ABI version codes (`141`-`143`), so
-  "What's new" shows for 0.5.6 on F-Droid.
+- Added F-Droid changelogs named after the per-ABI version codes (`151`-`153`
+  for this release), so "What's new" shows on F-Droid.
 
 ## [0.5.6] - 2026-10-02
 
