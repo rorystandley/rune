@@ -29,11 +29,12 @@ What you can do:
   behind an explicit warning.
 * Capture voice notes — recording stays entirely on your device.
 
-Free and open source under the GNU GPLv3. The security-critical code is a small,
-dependency-light, pure-Dart core so it can be read and audited. Releases ship
-with cryptographic provenance (SLSA build-provenance attestations and a keyless
-cosign signature) and are built reproducibly, so you can verify the binary was
-built from this source.
+Free and open source under the GNU GPL, version 3 or later. The security-critical code is a small,
+dependency-light, pure-Dart core so it can be read and audited. Releases published on
+GitHub ship with cryptographic provenance (SLSA build-provenance attestations
+and a keyless cosign signature) so you can verify those binaries were built from
+this source. Builds distributed by F-Droid are built and signed by F-Droid
+itself and are not covered by that provenance.
 
 This is honest software: it tells you what it does not yet do. See the project's
 SECURITY.md for the threat model and current limitations.

@@ -8,7 +8,7 @@ trust anyone with your data, and neither should you.
 <p align="center">
   <a href="https://github.com/rorystandley/rune/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/rorystandley/rune/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/rorystandley/rune/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/rorystandley/rune"></a>
-  <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/github/license/rorystandley/rune"></a>
+  <a href="LICENSE"><img alt="License: GPL-3.0-or-later" src="https://img.shields.io/github/license/rorystandley/rune"></a>
   <img alt="Platforms: iOS, Android, macOS, Windows, Linux" src="https://img.shields.io/badge/platforms-iOS%20%C2%B7%20Android%20%C2%B7%20macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-4c8dae">
 </p>
 
@@ -291,12 +291,14 @@ verify`, `cosign verify-blob`, `sha256sum -c`) are in
 
 ## License
 
-Licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE).
+Licensed under the **GNU General Public License, version 3 or (at your option)
+any later version** (`GPL-3.0-or-later`) — see [LICENSE](LICENSE).
 
 Copyright © 2026 Rory Standley.
 
 This is free software: you may redistribute and/or modify it under the terms of
-the GPLv3. It comes with **no warranty**. Contributions are welcome — see
+the GPL, either version 3 of the License or (at your option) any later version.
+It comes with **no warranty**. Contributions are welcome — see
 [CONTRIBUTING.md](CONTRIBUTING.md), which covers how contributions interact with
 app-store distribution. Distribution/packaging notes live in
 [RELEASE.md](RELEASE.md).

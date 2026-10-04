@@ -61,7 +61,8 @@ git commit -s -m "your message"
 ## Licensing of contributions
 
 By contributing, you agree that your contributions are licensed under the
-project's **GPLv3** (see [LICENSE](LICENSE)).
+project's **GPL-3.0-or-later** — the GNU GPL version 3, or (at your option) any
+later version (see [LICENSE](LICENSE)).
 
 **App-store note:** the GPLv3 conflicts with the additional usage restrictions
 imposed by Apple's App Store (and similar stores). So that this app can continue

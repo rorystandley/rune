@@ -1,0 +1,3 @@
+Adds F-Droid release notes, turns off system backups for app data (use the encrypted export instead), trims the app size slightly, and states the licence as GPL-3.0 or later. No change to your notes or encryption.
+
+Still fully offline: no network, no telemetry, no accounts. Not yet audited.
