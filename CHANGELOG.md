@@ -12,9 +12,10 @@ All notable changes to Rune are documented here. The format is based on
 
 - The licence is now stated explicitly as `GPL-3.0-or-later` (GPL version 3 or,
   at your option, any later version) in the README and CONTRIBUTING.
-- Android no longer opts in to system backups (`android:allowBackup="false"`),
-  so app-private files stay out of device transfers and cloud backups. Use the
-  encrypted export to back up your notes.
+- Android no longer opts in to system backups (`android:allowBackup="false"`
+  plus `dataExtractionRules` for Android 12+), so app-private files stay out of
+  device transfers and cloud backups. Use the encrypted export to back up your
+  notes.
 - The speech-to-text test fixture (`jfk.wav`) is no longer bundled in release
   APKs (about 352 KB smaller).
 - The store description no longer claims F-Droid builds are reproducible; the
