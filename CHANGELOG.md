@@ -6,6 +6,21 @@ All notable changes to Rune are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- Android no longer opts in to system backups (`android:allowBackup="false"`),
+  so app-private files stay out of device transfers and cloud backups. Use the
+  encrypted export to back up your notes.
+- The speech-to-text test fixture (`jfk.wav`) is no longer bundled in release
+  APKs (about 352 KB smaller).
+- The store description no longer claims F-Droid builds are reproducible; the
+  provenance statement now applies only to GitHub releases.
+
+### Fixed
+
+- Added F-Droid changelogs for the per-ABI version codes (`141`-`143`), so
+  "What's new" shows for 0.5.6 on F-Droid.
+
 ## [0.5.6] - 2026-10-02
 
 ### Fixed

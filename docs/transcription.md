@@ -156,6 +156,11 @@ flutter test -d <simulator-id> \
   integration_test/whisper_transcription_test.dart
 ```
 
+The test's WAV fixture is deliberately not declared as an app asset, so it
+does not ship in release APKs. Before running the gated test on a device or
+simulator, temporarily add `- integration_test/fixtures/jfk.wav` under
+`flutter: assets:` in `app/pubspec.yaml` (and revert it afterwards).
+
 The expected result is `isStub == false` and a transcript containing `ask not`
 and `country`.
 
