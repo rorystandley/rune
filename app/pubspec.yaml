@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
+  cupertino_icons: ^2.0.0
   # The pure-Dart vault engine (crypto, storage, services). No Flutter, no network.
   notes_core:
     path: ../packages/notes_core
@@ -25,7 +25,7 @@ dependencies:
   local_auth: ^3.0.2
   # Native share sheet for user-initiated single-note sharing. No network of
   # its own — it only hands text to the OS share UI.
-  share_plus: ^13.3.0
+  share_plus: ^13.3.1
   # Native file picker so the user can choose a `.notesbak` backup to import or
   # restore. Local file selection only — it makes no network calls. Uses the
   # Flutter-team file_selector (not file_picker) because file_picker pins
