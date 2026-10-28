@@ -49,18 +49,63 @@ class _VoiceNoteSheetState extends State<_VoiceNoteSheet> {
   Duration _elapsed = Duration.zero;
   Timer? _ticker;
 
+  /// Bumped when the sheet is dismissed or the vault locks, so an in-flight
+  /// permission check or transcription cannot start or keep a capture.
+  int _session = 0;
+  bool _sessionClosed = false;
+
+  /// Set only after transcription finishes with "keep audio" on, so closing
+  /// the sheet does not delete that recording.
+  bool _retainOnClose = false;
+
   AppController get _c => widget.controller;
 
   @override
   void initState() {
     super.initState();
+    widget.controller.addListener(_onController);
     _check();
   }
 
   @override
   void dispose() {
-    _ticker?.cancel();
+    widget.controller.removeListener(_onController);
+    _closeSession();
     super.dispose();
+  }
+
+  void _onController() {
+    if (widget.controller.phase == AppPhase.unlocked) return;
+    if (!mounted) return;
+    // Capture the route before closing. removeRoute drops the sheet even when
+    // app-lifecycle pause has stopped route animations, so the lock screen is
+    // what remains.
+    final route = ModalRoute.of(context);
+    final navigator = Navigator.of(context);
+    _closeSession();
+    if (route != null && route.isActive) {
+      navigator.removeRoute(route);
+    }
+  }
+
+  bool _sessionOpen(int session) =>
+      !_sessionClosed &&
+      mounted &&
+      session == _session &&
+      widget.controller.phase == AppPhase.unlocked;
+
+  /// Stops the microphone and deletes the in-progress file. Safe to call more
+  /// than once. Does not remove a recording the user already chose to keep.
+  void _closeSession() {
+    if (_sessionClosed) return;
+    _sessionClosed = true;
+    _session++;
+    _ticker?.cancel();
+    _ticker = null;
+    final deleteFile = !_retainOnClose;
+    final path = deleteFile ? _audioPath : null;
+    _audioPath = null;
+    unawaited(_stopRecorderAndDelete(path, delete: deleteFile));
   }
 
   Future<void> _check() async {
@@ -74,18 +119,28 @@ class _VoiceNoteSheetState extends State<_VoiceNoteSheet> {
   }
 
   Future<void> _startRecording() async {
+    final session = _session;
     if (!await _c.recorder.hasPermission()) {
-      if (!mounted) return;
+      if (!_sessionOpen(session)) return;
       setState(() {
         _stage = _Stage.failed;
         _message = 'Microphone permission was not granted.';
       });
       return;
     }
+    // Re-check after every await. The sheet may have been dismissed, or the
+    // vault locked, while the permission prompt was up.
+    if (!_sessionOpen(session)) return;
     await _c.audioTempDir.create(recursive: true);
-    final path = '${_c.audioTempDir.path}/voice-${DateTime.now().millisecondsSinceEpoch}.wav';
+    if (!_sessionOpen(session)) return;
+    final path =
+        '${_c.audioTempDir.path}/voice-${DateTime.now().millisecondsSinceEpoch}.wav';
+    _audioPath = path;
     await _c.recorder.start(path);
-    if (!mounted) return;
+    if (!_sessionOpen(session)) {
+      await _stopRecorderAndDelete(path, delete: true);
+      return;
+    }
     setState(() {
       _audioPath = path;
       _stage = _Stage.recording;
@@ -97,16 +152,23 @@ class _VoiceNoteSheetState extends State<_VoiceNoteSheet> {
   }
 
   Future<void> _stopAndTranscribe() async {
+    final session = _session;
     _ticker?.cancel();
+    _ticker = null;
     setState(() => _stage = _Stage.transcribing);
     final recordedPath = await _c.recorder.stop() ?? _audioPath;
+    _audioPath = recordedPath;
+    if (!_sessionOpen(session)) {
+      await _stopRecorderAndDelete(recordedPath, delete: true);
+      return;
+    }
 
     final transcription = _c.transcription;
     if (transcription == null) {
       // Should be unreachable (the entry point is disabled), but never inject
       // placeholder text if we somehow get here.
-      await _discardIfNeeded(recordedPath);
-      if (mounted) {
+      await _deleteAudio(recordedPath);
+      if (_sessionOpen(session)) {
         setState(() {
           _stage = _Stage.failed;
           _message =
@@ -119,47 +181,109 @@ class _VoiceNoteSheetState extends State<_VoiceNoteSheet> {
     final appended = widget.onTranscribed != null;
     try {
       final result = await transcription.transcribe(
-        TranscriptionRequest(audioFilePath: recordedPath ?? '', languageHint: 'en'),
+        TranscriptionRequest(
+          audioFilePath: recordedPath ?? '',
+          languageHint: 'en',
+        ),
       );
+      if (!_sessionOpen(session)) {
+        await _deleteAudio(recordedPath);
+        return;
+      }
       if (widget.onTranscribed != null) {
         widget.onTranscribed!(result.text);
       } else {
         final note = await _c.newNote();
         await _c.saveNote(note.id, title: 'Voice note', body: result.text);
       }
-
-      await _discardIfNeeded(recordedPath);
-
-      if (mounted) {
-        Navigator.of(context).pop();
-        final where = appended ? 'Added to note.' : 'Voice note added.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '$where ${_keepAudio ? 'Audio kept locally.' : 'Audio discarded.'}',
-            ),
-          ),
-        );
+      if (!_sessionOpen(session)) {
+        await _deleteAudio(recordedPath);
+        return;
       }
+
+      if (_keepAudio) {
+        _retainOnClose = true;
+        await _retainAudio(recordedPath);
+      } else {
+        await _deleteAudio(recordedPath);
+      }
+      _audioPath = null;
+
+      if (!_sessionOpen(session) || !mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.of(context).pop();
+      final where = appended ? 'Added to note.' : 'Voice note added.';
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '$where ${_keepAudio ? 'Audio kept locally.' : 'Audio discarded.'}',
+          ),
+        ),
+      );
     } catch (_) {
       // On-device transcription failed to run. Surface an honest error rather
       // than writing placeholder text into the note.
-      await _discardIfNeeded(recordedPath);
-      if (mounted) {
-        setState(() {
-          _stage = _Stage.failed;
-          _message =
-              'On-device transcription failed to run. Your recording was not '
-              'added.';
-        });
-      }
+      await _deleteAudio(recordedPath);
+      if (!_sessionOpen(session)) return;
+      setState(() {
+        _stage = _Stage.failed;
+        _message =
+            'On-device transcription failed to run. Your recording was not '
+            'added.';
+      });
     }
   }
 
-  Future<void> _discardIfNeeded(String? recordedPath) async {
-    if (_keepAudio || recordedPath == null) return;
-    final f = File(recordedPath);
-    if (await f.exists()) await f.delete();
+  /// Moves a finished recording aside so the unlock sweep keeps it.
+  Future<void> _retainAudio(String? recordedPath) async {
+    if (recordedPath == null) return;
+    final file = File(recordedPath);
+    try {
+      if (!await file.exists()) return;
+      final name = _audioBaseName(recordedPath);
+      if (name.startsWith(AppController.keptAudioFilePrefix)) return;
+      final dest = File(
+        '${file.parent.path}/${AppController.keptAudioFilePrefix}$name',
+      );
+      await file.rename(dest.path);
+    } catch (_) {
+      // If the rename does not land, the temporary name is removed on the
+      // next unlock.
+    }
+  }
+
+  Future<void> _stopRecorderAndDelete(
+    String? path, {
+    required bool delete,
+  }) async {
+    try {
+      if (await _c.recorder.isRecording()) {
+        final stopped = await _c.recorder.stop();
+        if (delete && path == null) path = stopped;
+      }
+    } catch (_) {
+      // Stopping is best-effort. The unlock sweep removes a leftover file.
+    }
+    if (!delete) return;
+    await _deleteAudio(path);
+  }
+
+  Future<void> _deleteAudio(String? path) async {
+    if (path == null) return;
+    if (_audioBaseName(path).startsWith(AppController.keptAudioFilePrefix)) {
+      return;
+    }
+    final file = File(path);
+    try {
+      if (await file.exists()) await file.delete();
+    } catch (_) {
+      // The file may still be open. The next unlock tries again.
+    }
+  }
+
+  String _audioBaseName(String path) {
+    final separator = path.lastIndexOf(RegExp(r'[/\\]'));
+    return separator == -1 ? path : path.substring(separator + 1);
   }
 
   @override

@@ -163,8 +163,19 @@ random 128-bit ids, not derived from content.
   cycle with `print` intercepted and asserts the passphrase and note body never
   appear in output. The UI layer logs nothing sensitive.
 - **Never persisted in the clear.** Decrypted notes exist only in memory
-  (`NotesRepository`) while unlocked and are dropped on lock. The only way
-  plaintext touches disk is the explicit, confirmation-gated plaintext export.
+  (`NotesRepository`) while unlocked and are dropped on lock. Note text touches
+  disk in the clear only through the explicit, confirmation-gated plaintext
+  export.
+- **Temporary voice recordings.** A voice note may write a short-lived audio
+  file under `audio_tmp/` while it is being captured. Dismissing that sheet or
+  locking the vault stops the microphone and deletes the file. The recording
+  is kept only when the user turns on "Keep audio recording" and transcription
+  finishes. The first unlock after this rule also keeps every `voice-*.wav`
+  already in `audio_tmp/`, because an older build did not record which of
+  those files the user meant to keep. A marker file next to settings (no
+  secrets and no note text) records that this one-time pass has finished.
+  After that, any other file left in `audio_tmp/` is removed on the next
+  unlock. Locking does not ask the user to confirm.
 - **Optional cached DEK.** If biometric / OS unlock is enabled, the DEK is also
   stored in the platform credential store for this device only. This setting is
   off by default, can be disabled, and never stores the passphrase.

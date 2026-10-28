@@ -42,10 +42,20 @@ class AppController extends ChangeNotifier {
     importer = ImportService(store: store);
   }
 
+  /// File-name prefix for a voice recording that should survive unlock.
+  /// Other files in [audioTempDir] are removed on unlock, after a one-time
+  /// pass that keeps any `voice-*.wav` already there.
+  static const keptAudioFilePrefix = 'kept-';
+
+  /// Non-secret marker written beside settings once pre-existing voice
+  /// captures have been preserved. It holds no note text.
+  static const voiceAudioMigrationMarkerName = 'voice_audio_migrated';
+
   final Directory vaultDir;
   final Directory audioTempDir;
   final Directory exportsDir;
   final SettingsStore settingsStore;
+
   /// On-device transcription engine, or `null` when this platform has no
   /// bundled engine (voice notes are then disabled rather than stubbed).
   final TranscriptionService? transcription;
@@ -141,7 +151,7 @@ class AppController extends ChangeNotifier {
           // The vault is already usable if this preference write fails.
         }
       }
-      _enterUnlocked();
+      await _enterUnlocked();
     } on VaultAlreadyExistsException {
       // The vault file is already on disk — often because an earlier attempt
       // in this session wrote it and then failed while touching biometric
@@ -167,7 +177,7 @@ class AppController extends ChangeNotifier {
     try {
       await vault.unlock(passphrase);
       await repo.loadAll();
-      _enterUnlocked();
+      await _enterUnlocked();
       return true;
     } on WrongPassphraseException {
       _unlockError = 'Incorrect passphrase.';
@@ -189,15 +199,123 @@ class AppController extends ChangeNotifier {
     _biometricUnlockError = null;
     _phase = AppPhase.locked;
     notifyListeners();
+    // Stop a capture that outlived the sheet. The returned path is the
+    // in-progress file, never a recording the user already chose to keep.
+    unawaited(_releaseActiveRecording());
   }
 
-  void _enterUnlocked() {
+  Future<void> _enterUnlocked() async {
+    // Preserve pre-existing captures before the sweep, and only sweep once
+    // that pass has been recorded. Otherwise a rename that did not finish
+    // would be deleted as a leftover.
+    if (await _preservePreExistingVoiceAudio()) {
+      await _removeLeftoverAudio();
+    }
     _selectedId = null; // show the list; user picks a note
     _search = '';
     _unlockError = null;
     _phase = AppPhase.unlocked;
     _resetAutoLock();
     notifyListeners();
+  }
+
+  /// Stops the microphone if it is still running and deletes that capture.
+  Future<void> _releaseActiveRecording() async {
+    try {
+      if (!await recorder.isRecording()) return;
+      final path = await recorder.stop();
+      await _deleteUnkeptAudio(path);
+    } catch (_) {
+      // Lock has already dropped note content. A failed stop is retried by
+      // the next unlock sweep of [audioTempDir].
+    }
+  }
+
+  File get _voiceAudioMigrationMarker =>
+      File('${settingsStore.file.parent.path}/$voiceAudioMigrationMarkerName');
+
+  /// Renames every pre-existing `voice-*.wav` to the kept prefix, once.
+  ///
+  /// Older builds left both kept recordings and abandoned ones under that
+  /// name, and they cannot be told apart. The marker makes the pass
+  /// idempotent so a later in-progress `voice-*.wav` is not renamed.
+  /// Returns whether the marker is in place and the sweep may run.
+  Future<bool> _preservePreExistingVoiceAudio() async {
+    final marker = _voiceAudioMigrationMarker;
+    try {
+      if (await marker.exists()) return true;
+    } catch (_) {
+      return false;
+    }
+
+    try {
+      if (await audioTempDir.exists()) {
+        final pending = <File>[];
+        await for (final entity in audioTempDir.list(followLinks: false)) {
+          if (entity is! File) continue;
+          if (_isLegacyVoiceCapture(_audioBaseName(entity.path))) {
+            pending.add(entity);
+          }
+        }
+        for (final file in pending) {
+          final name = _audioBaseName(file.path);
+          var dest = File('${file.parent.path}/$keptAudioFilePrefix$name');
+          var suffix = 2;
+          while (await dest.exists()) {
+            if (suffix > 1000) {
+              throw StateError('Could not rename a voice capture.');
+            }
+            dest = File(
+              '${file.parent.path}/$keptAudioFilePrefix$suffix-$name',
+            );
+            suffix++;
+          }
+          await file.rename(dest.path);
+        }
+      }
+      await marker.parent.create(recursive: true);
+      await marker.writeAsString('1\n', flush: true);
+      return true;
+    } catch (_) {
+      // Leave the marker unset so the next unlock retries. Skip the sweep
+      // until then so an un-renamed capture is not deleted.
+      return false;
+    }
+  }
+
+  bool _isLegacyVoiceCapture(String name) =>
+      name.startsWith('voice-') && name.endsWith('.wav');
+
+  /// Deletes temporary voice files left behind by an abandoned capture.
+  /// Recordings the user kept (name starts with [keptAudioFilePrefix]) stay.
+  Future<void> _removeLeftoverAudio() async {
+    try {
+      if (!await audioTempDir.exists()) return;
+      await for (final entity in audioTempDir.list(followLinks: false)) {
+        if (entity is! File) continue;
+        await _deleteUnkeptAudio(entity.path);
+      }
+    } catch (_) {
+      // Unlock still proceeds. A file that could not be listed is retried
+      // on the next unlock.
+    }
+  }
+
+  Future<void> _deleteUnkeptAudio(String? path) async {
+    if (path == null) return;
+    final name = _audioBaseName(path);
+    if (name.startsWith(keptAudioFilePrefix)) return;
+    final file = File(path);
+    try {
+      if (await file.exists()) await file.delete();
+    } catch (_) {
+      // The file may still be open. The next unlock tries again.
+    }
+  }
+
+  String _audioBaseName(String path) {
+    final separator = path.lastIndexOf(RegExp(r'[/\\]'));
+    return separator == -1 ? path : path.substring(separator + 1);
   }
 
   Future<void> changePassphrase(String current, String next) async {
@@ -297,7 +415,7 @@ class AppController extends ChangeNotifier {
         _zero(cachedDek);
       }
 
-      _enterUnlocked();
+      await _enterUnlocked();
       return true;
     } catch (_) {
       _unlockError = 'Biometric unlock failed. Use your passphrase.';
@@ -510,7 +628,10 @@ class AppController extends ChangeNotifier {
         }
         try {
           await _disableBiometricUnlock(saveSettings: true);
-          await _refreshBiometricUnlockState(vaultExists: exists, notify: false);
+          await _refreshBiometricUnlockState(
+            vaultExists: exists,
+            notify: false,
+          );
         } catch (_) {
           // Best-effort: the vault is already locked in memory.
           _biometricUnlockReady = false;
