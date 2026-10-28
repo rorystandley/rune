@@ -23,6 +23,10 @@ class VaultService {
   Uint8List? _dek;
   VaultMetadata? _meta;
 
+  /// Identifies the unlocked session. [lock] advances it so a passphrase
+  /// change that finishes later cannot install a data key.
+  int _generation = 0;
+
   bool get isUnlocked => _dek != null;
   Future<bool> vaultExists() => store.vaultExists();
 
@@ -89,6 +93,7 @@ class VaultService {
 
   /// Drops and zeroes all in-memory secret state.
   void lock() {
+    _generation++;
     final dek = _dek;
     if (dek != null) _zero(dek);
     _dek = null;
@@ -97,9 +102,12 @@ class VaultService {
 
   /// Re-wraps the existing DEK under a key derived from [next]. Note content is
   /// never re-encrypted. Verifies [current] first (throws
-  /// [WrongPassphraseException] if wrong). Leaves the vault unlocked.
+  /// [WrongPassphraseException] if wrong). Leaves the vault unlocked, unless
+  /// [lock] ran while the header write was in flight — then the new header is
+  /// kept and the in-memory key is wiped instead of restored.
   Future<void> changePassphrase(String current, String next) async {
     if (next.isEmpty) throw ArgumentError('Passphrase must not be empty');
+    final generation = _generation;
     final meta = await store.readMetadata();
     final crypto = _cryptoFor(meta.cipher);
 
@@ -107,28 +115,37 @@ class VaultService {
     final dek = await crypto.unwrapDek(meta.wrappedKey, currentKek);
     _zero(currentKek);
 
-    final newParams = crypto.newKdfParams(
-      memoryKiB: meta.kdfParams.memoryKiB,
-      iterations: meta.kdfParams.iterations,
-      parallelism: meta.kdfParams.parallelism,
-    );
-    final newKek = await crypto.deriveKek(next, newParams);
-    final rewrapped = await crypto.wrapDek(dek, newKek);
-    _zero(newKek);
+    var installed = false;
+    try {
+      final newParams = crypto.newKdfParams(
+        memoryKiB: meta.kdfParams.memoryKiB,
+        iterations: meta.kdfParams.iterations,
+        parallelism: meta.kdfParams.parallelism,
+      );
+      final newKek = await crypto.deriveKek(next, newParams);
+      final rewrapped = await crypto.wrapDek(dek, newKek);
+      _zero(newKek);
 
-    final newMeta = VaultMetadata(
-      version: meta.version,
-      createdAt: meta.createdAt,
-      kdfParams: newParams,
-      cipher: meta.cipher,
-      wrappedKey: rewrapped,
-    );
-    await store.writeMetadata(newMeta);
+      final newMeta = VaultMetadata(
+        version: meta.version,
+        createdAt: meta.createdAt,
+        kdfParams: newParams,
+        cipher: meta.cipher,
+        wrappedKey: rewrapped,
+      );
+      await store.writeMetadata(newMeta);
 
-    final previous = _dek;
-    if (previous != null && !identical(previous, dek)) _zero(previous);
-    _dek = dek;
-    _meta = newMeta;
+      // The header write may finish after lock. The data key must not.
+      if (generation != _generation) return;
+
+      final previous = _dek;
+      if (previous != null && !identical(previous, dek)) _zero(previous);
+      _dek = dek;
+      _meta = newMeta;
+      installed = true;
+    } finally {
+      if (!installed) _zero(dek);
+    }
   }
 
   /// Encrypts note plaintext bytes with the in-memory DEK.

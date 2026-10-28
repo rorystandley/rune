@@ -26,6 +26,10 @@ class NotesRepository {
   final Random _random = Random.secure();
   bool _loaded = false;
 
+  /// Identifies the in-memory session. [clear] advances it so a write that
+  /// finishes later cannot put a decrypted note back into [_notes].
+  int _generation = 0;
+
   bool get isLoaded => _loaded;
 
   /// Number of live (not soft-deleted) notes.
@@ -49,6 +53,7 @@ class NotesRepository {
 
   /// Drops all decrypted notes from memory (called on lock).
   void clear() {
+    _generation++;
     _notes.clear();
     _loaded = false;
   }
@@ -81,6 +86,7 @@ class NotesRepository {
   }
 
   Future<Note> createNote({String title = '', String body = ''}) async {
+    final generation = _generation;
     final now = DateTime.now().toUtc();
     final note = Note(
       id: _newId(),
@@ -90,7 +96,7 @@ class NotesRepository {
       updatedAt: now,
     );
     await _persist(note);
-    _notes[note.id] = note;
+    _remember(note, generation);
     return note;
   }
 
@@ -116,8 +122,9 @@ class NotesRepository {
       pinned: source.pinned,
       deletedAt: source.deletedAt,
     );
+    final generation = _generation;
     await _persist(imported);
-    _notes[imported.id] = imported;
+    _remember(imported, generation);
     return imported;
   }
 
@@ -133,6 +140,7 @@ class NotesRepository {
   }
 
   Future<Note> updateNote(String id, {String? title, String? body}) async {
+    final generation = _generation;
     final existing = getNote(id);
     if (existing == null) {
       throw StateError('Cannot update unknown note');
@@ -143,7 +151,7 @@ class NotesRepository {
       updatedAt: DateTime.now().toUtc(),
     );
     await _persist(updated);
-    _notes[id] = updated;
+    _remember(updated, generation);
     return updated;
   }
 
@@ -151,6 +159,7 @@ class NotesRepository {
   /// organizing action, not an edit. No-op (returns the existing note) when the
   /// pin state is already what was requested.
   Future<Note> setPinned(String id, bool pinned) async {
+    final generation = _generation;
     final existing = getNote(id);
     if (existing == null) {
       throw StateError('Cannot pin unknown note');
@@ -158,7 +167,7 @@ class NotesRepository {
     if (existing.pinned == pinned) return existing;
     final updated = existing.copyWith(pinned: pinned);
     await _persist(updated);
-    _notes[id] = updated;
+    _remember(updated, generation);
     return updated;
   }
 
@@ -167,22 +176,24 @@ class NotesRepository {
   /// No-op if the note is unknown or already deleted. Returns the deleted note,
   /// or null if there was nothing live to delete.
   Future<Note?> deleteNote(String id) async {
+    final generation = _generation;
     final existing = getNote(id);
     if (existing == null) return null;
     final deleted = existing.copyWith(deletedAt: DateTime.now().toUtc());
     await _persist(deleted);
-    _notes[id] = deleted;
+    _remember(deleted, generation);
     return deleted;
   }
 
   /// Restores a soft-deleted note back into the main list. No-op (returns null)
   /// if the note is unknown or already live.
   Future<Note?> restoreNote(String id) async {
+    final generation = _generation;
     final existing = _notes[id];
     if (existing == null || !existing.isDeleted) return null;
     final restored = existing.copyWith(deletedAt: null);
     await _persist(restored);
-    _notes[id] = restored;
+    _remember(restored, generation);
     return restored;
   }
 
@@ -235,6 +246,14 @@ class NotesRepository {
   Future<void> _persist(Note note) async {
     final sealed = await vault.sealNote(note.toEncodedBytes());
     await store.writeNoteBlob(note.id, sealed);
+  }
+
+  /// Keeps [note] only if this session is still the one that started the write
+  /// and the vault is still unlocked. A ciphertext write may finish after
+  /// lock; the decrypted note must not.
+  void _remember(Note note, int generation) {
+    if (generation != _generation || !vault.isUnlocked) return;
+    _notes[note.id] = note;
   }
 
   /// 128-bit random, lowercase-hex id. Opaque; leaks nothing about content.

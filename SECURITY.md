@@ -244,7 +244,10 @@ the app is safe against an attacker who can read process memory.
 - **Lock-on-background** (default on) locks when the app is paused/hidden, so the
   OS app switcher and a backgrounded app don't expose notes.
 
-Locking zeroes the in-memory keys (best effort) and clears decrypted notes.
+Locking zeroes the in-memory keys (best effort) and clears decrypted notes. A
+save or passphrase change already in progress may finish writing ciphertext,
+but it must not put a decrypted note or the data key back into memory after
+the session has locked.
 
 ---
 
