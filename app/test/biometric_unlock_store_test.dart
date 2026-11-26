@@ -115,6 +115,14 @@ void main() {
   });
 
   group('platform credential access', () {
+    test('Android prompts for biometrics on every cache read', () {
+      final options = PlatformBiometricUnlockStore.androidStorageOptions
+          .toMap();
+      expect(options['enforceBiometrics'], 'true');
+      expect(options['requireBiometricsPerOperation'], 'true');
+      expect(options['biometricType'], 'strongBiometricOnly');
+    });
+
     test('Windows authenticates before writing the cached DEK', () async {
       final events = <String>[];
       final storage = FakeSecureStorage(events: events);

@@ -363,6 +363,97 @@ void main() {
     expect(controller.phase, AppPhase.locked);
   });
 
+  test(
+    'lock-on-background drops the session and blocks automatic unlock',
+    () async {
+      final biometrics = MemoryBiometricUnlockStore();
+      controller.dispose();
+      controller = await buildController(biometricUnlockStore: biometrics);
+
+      await controller.createVault('passphrase123');
+      final note = await controller.newNote();
+      await controller.saveNote(note.id, title: 'Visible', body: 'secret');
+      expect(await controller.enableBiometricUnlock(), isTrue);
+      expect(controller.settings.lockOnBackground, isTrue);
+
+      controller.onSentToBackground();
+
+      expect(controller.phase, AppPhase.locked);
+      expect(controller.vault.isUnlocked, isFalse);
+      expect(controller.visibleNotes, isEmpty);
+      expect(controller.canUnlockWithBiometric, isTrue);
+      expect(controller.allowsAutomaticBiometricUnlock, isFalse);
+
+      expect(await controller.unlockWithBiometric(), isTrue);
+      expect(controller.visibleNotes.single.title, 'Visible');
+    },
+  );
+
+  test(
+    'turning off lock-on-background leaves an unlocked session alone',
+    () async {
+      await controller.createVault('passphrase123');
+      await controller.updateSettings(
+        controller.settings.copyWith(lockOnBackground: false),
+      );
+
+      controller.onSentToBackground();
+
+      expect(controller.phase, AppPhase.unlocked);
+      expect(controller.vault.isUnlocked, isTrue);
+    },
+  );
+
+  test('a lock stays locked until the user unlocks', () async {
+    final biometrics = MemoryBiometricUnlockStore();
+    controller.dispose();
+    controller = await buildController(biometricUnlockStore: biometrics);
+
+    await controller.createVault('passphrase123');
+    await controller.newNote();
+    expect(await controller.enableBiometricUnlock(), isTrue);
+
+    controller.lock();
+
+    expect(controller.phase, AppPhase.locked);
+    expect(controller.vault.isUnlocked, isFalse);
+    expect(controller.canUnlockWithBiometric, isTrue);
+    expect(controller.allowsAutomaticBiometricUnlock, isFalse);
+    expect(await controller.unlock('passphrase123'), isTrue);
+    expect(controller.phase, AppPhase.unlocked);
+  });
+
+  test('a newly started locked vault may unlock automatically', () async {
+    final biometrics = MemoryBiometricUnlockStore();
+    controller.dispose();
+    controller = await buildController(biometricUnlockStore: biometrics);
+    await controller.createVault('passphrase123');
+    expect(await controller.enableBiometricUnlock(), isTrue);
+    final settings = controller.settingsStore;
+    controller.dispose();
+
+    // buildController would overwrite settings.json. A restarted app loads
+    // the file the previous process saved.
+    controller = AppController(
+      vaultDir: Directory('${root.path}/vault'),
+      audioTempDir: Directory('${root.path}/audio'),
+      exportsDir: Directory('${root.path}/exports'),
+      settingsStore: settings,
+      transcription: const StubTranscriptionService(),
+      recorder: const UnavailableAudioRecorder(),
+      biometricUnlockStore: biometrics,
+      createKdfParams: CryptoService().newKdfParams(
+        memoryKiB: 256,
+        iterations: 1,
+        parallelism: 1,
+      ),
+    );
+    await controller.init();
+
+    expect(controller.phase, AppPhase.locked);
+    expect(controller.allowsAutomaticBiometricUnlock, isTrue);
+  });
+
   test('enabled biometric unlock reopens the vault with cached DEK', () async {
     final biometrics = MemoryBiometricUnlockStore();
     controller.dispose();

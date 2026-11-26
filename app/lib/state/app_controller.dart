@@ -81,6 +81,13 @@ class AppController extends ChangeNotifier {
       );
   bool _biometricUnlockReady = false;
   bool _busy = false;
+
+  /// True for a locked session the user has not locked in this process
+  /// (the app was started locked). [lock] clears it. The unlock screen must
+  /// not read the platform cache after a lock: on Android that cache stays
+  /// unwrapped for the rest of the process, so an automatic read would put
+  /// the notes back with no new gesture.
+  bool _allowAutomaticBiometricUnlock = true;
   Timer? _autoLockTimer;
 
   AppPhase get phase => _phase;
@@ -96,6 +103,12 @@ class AppController extends ChangeNotifier {
   bool get biometricUnlockReady => _biometricUnlockReady;
   bool get canUnlockWithBiometric =>
       _phase == AppPhase.locked && _biometricUnlockReady && !_busy;
+
+  /// Whether the lock screen may ask the platform for the cached data key
+  /// without a tap. False after [lock], including inactivity and
+  /// lock-on-background. Still true when the app opens already locked.
+  bool get allowsAutomaticBiometricUnlock =>
+      _allowAutomaticBiometricUnlock && canUnlockWithBiometric;
   bool get busy => _busy;
   String get vaultLocation => store.description;
 
@@ -191,6 +204,9 @@ class AppController extends ChangeNotifier {
   void lock() {
     _autoLockTimer?.cancel();
     _autoLockTimer = null;
+    // A lock is not an unlock request. Leave this false for the rest of the
+    // process so the screen that replaces the notes cannot read the cache.
+    _allowAutomaticBiometricUnlock = false;
     repo.clear();
     vault.lock();
     _selectedId = null;

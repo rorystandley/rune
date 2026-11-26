@@ -59,7 +59,9 @@ class _UnlockScreenState extends State<UnlockScreen>
     }
 
     final controller = AppScope.of(context);
-    if (!controller.canUnlockWithBiometric) return;
+    // Startup may ask. A lock the user just caused (button, timer, or
+    // background) must stay locked until they unlock.
+    if (!controller.allowsAutomaticBiometricUnlock) return;
     _automaticBiometricUnlockAttempted = true;
     await controller.unlockWithBiometric();
   }

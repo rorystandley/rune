@@ -22,7 +22,8 @@ honestly private" to "would survive scrutiny on r/privacy".
 4. **Biometric / OS-keystore unlock as an *option*.** Implemented: users can
    cache the vault DEK behind Face ID / Touch ID / Windows Hello via the
    platform credential store, without ever weakening the passphrase-only path.
-   Strictly opt-in, then automatic on each locked session while enabled.
+   Strictly opt-in. Opening the app can prompt automatically; a lock waits
+   for the user to unlock.
 
 5. **Secure deletion & anti-forensics.** Best-effort secure-delete of note files
    and temp audio, scrub note caches more aggressively, and investigate

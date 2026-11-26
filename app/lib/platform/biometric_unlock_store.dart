@@ -68,15 +68,24 @@ class PlatformBiometricUnlockStore implements BiometricUnlockStore {
 
   static const String _cacheKey = 'rune.platform_unlock_cache.v1';
 
+  /// Android credential-store options for the cached data key.
+  ///
+  /// `requireBiometricsPerOperation` keeps the plugin from holding the
+  /// unwrapped storage key in memory. Without it, the first successful
+  /// prompt authorizes every later read in the process.
+  @visibleForTesting
+  static const AndroidOptions androidStorageOptions = AndroidOptions.biometric(
+    enforceBiometrics: true,
+    requireBiometricsPerOperation: true,
+    biometricType: AndroidBiometricType.strongBiometricOnly,
+    storageNamespace: 'rune_biometric_unlock',
+    biometricPromptTitle: 'Unlock Rune',
+    biometricPromptSubtitle: 'Use your biometric credential',
+    biometricPromptNegativeButton: 'Use passphrase',
+  );
+
   static const FlutterSecureStorage _defaultStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions.biometric(
-      enforceBiometrics: true,
-      biometricType: AndroidBiometricType.strongBiometricOnly,
-      storageNamespace: 'rune_biometric_unlock',
-      biometricPromptTitle: 'Unlock Rune',
-      biometricPromptSubtitle: 'Use your biometric credential',
-      biometricPromptNegativeButton: 'Use passphrase',
-    ),
+    aOptions: androidStorageOptions,
     iOptions: IOSOptions(
       accountName: 'rune-biometric-unlock',
       accessibility: KeychainAccessibility.unlocked_this_device,
