@@ -147,6 +147,7 @@ Both are expected to report **no issues**.
   opt-in integration test, see `docs/transcription.md`.
 - Per-platform file-permission behaviour of the vault directory.
 - Real Face ID / Touch ID / Windows Hello prompts in CI; controller behavior is
-  tested with an in-memory fake, including automatic locked-session invocation
-  and duplicate-prompt prevention, while native prompts require device testing.
+  tested with an in-memory fake. Opening a locked app may ask automatically,
+  and a later lock does not read the cache until the user asks. A canceled
+  startup prompt is not retried. Native prompts require device testing.
 - Fuzzing of the `vault.json` / backup parsers (on the roadmap).

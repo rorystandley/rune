@@ -112,9 +112,10 @@ each note ──encrypt with DEK (XChaCha20-Poly1305, random nonce)──▶ .no
 - A **wrong passphrase** produces a wrong KEK, which fails the wrapped key's
   authentication tag, and unlock is rejected. (Proven by tests.)
 - Optional biometric / OS unlock caches the DEK in this device's platform
-  credential store, and only after you opt in. Once enabled, platform
-  authentication starts automatically on each locked session; the passphrase path
-  is unchanged and always available.
+  credential store, and only after you opt in. Opening the app can ask for
+  that credential automatically. Locking — the lock button, the inactivity
+  timer, or sending the app to the background — stays locked until you unlock
+  it. The passphrase path is unchanged and always available.
 
 ### On-disk layout
 
@@ -235,8 +236,8 @@ security tests pass publicly on each commit (see the CI badge above).
 - Lock / unlock; the app starts locked if a vault exists; manual lock; auto-lock
   on inactivity; lock-on-background.
 - Optional Face ID / Touch ID / Windows Hello unlock, off by default, caching only
-  the vault DEK behind the platform credential store and prompting automatically
-  after opt-in.
+  the vault DEK behind the platform credential store. Opening a locked app can
+  prompt automatically; locking again waits until you unlock.
 - Argon2id + XChaCha20-Poly1305 envelope encryption; encrypted at rest.
 - A wrong passphrase cannot decrypt (test-proven).
 - Notes: create, edit (autosave), delete, list, local search.

@@ -6,6 +6,13 @@ All notable changes to Rune are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- Locking stays locked. The lock button, the inactivity timer, and sending
+  the app to the background no longer drop back into the notes when platform
+  unlock is enabled. Android asks for biometrics on every read of the cached
+  key. Opening the app can still offer platform unlock automatically.
+
 ## [0.5.7] - 2026-10-04
 
 ### Changed

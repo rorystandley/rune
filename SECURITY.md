@@ -59,10 +59,14 @@ The cached item contains the DEK plus a non-secret binding to the current vault
 header. It does **not** contain the passphrase or passphrase-derived KEK. If the
 binding no longer matches, or the user disables the setting, the cache is not
 used and the secure-storage entry is deleted. A fresh install, another device,
-or a user who never opts in remains passphrase-only. Once enabled, Rune requests
-platform authentication automatically when a locked session is shown. A
-canceled or failed prompt leaves the passphrase form and a manual platform-unlock
-retry available; it does not weaken or bypass either credential gate.
+or a user who never opts in remains passphrase-only. When the app **starts**
+and a vault is already locked, Rune requests platform authentication
+automatically. A manual lock, the inactivity timer, and lock-on-background do
+not: the vault stays locked until the user submits the passphrase or chooses
+platform unlock. A canceled or failed prompt leaves the passphrase form and a
+manual platform-unlock retry available; it does not weaken or bypass either
+credential gate. On Android every read of the cache requires a new biometric
+prompt, so an earlier success in the same process cannot open the vault again.
 
 ### Why this design
 
@@ -178,7 +182,8 @@ random 128-bit ids, not derived from content.
   unlock. Locking does not ask the user to confirm.
 - **Optional cached DEK.** If biometric / OS unlock is enabled, the DEK is also
   stored in the platform credential store for this device only. This setting is
-  off by default, can be disabled, and never stores the passphrase.
+  off by default, can be disabled, and never stores the passphrase. On Android
+  each read of that cache requires a new biometric prompt.
 - **Clipboard.** The app does not copy note content or passphrases to the
   clipboard. (File *paths* shown after export are user-selectable text, which the
   user may copy deliberately.)
@@ -255,8 +260,10 @@ the app is safe against an attacker who can read process memory.
 - **Lock-on-background** (default on) locks when the app is paused/hidden, so the
   OS app switcher and a backgrounded app don't expose notes.
 
-Locking zeroes the in-memory keys (best effort) and clears decrypted notes. A
-save or passphrase change already in progress may finish writing ciphertext,
+Locking zeroes the in-memory keys (best effort) and clears decrypted notes.
+Showing the lock screen after one of these locks does not read the platform
+unlock cache, so a cached data key cannot unlock the session again by itself.
+A save or passphrase change already in progress may finish writing ciphertext,
 but it must not put a decrypted note or the data key back into memory after
 the session has locked.
 

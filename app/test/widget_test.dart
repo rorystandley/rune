@@ -369,7 +369,7 @@ void main() {
     });
   });
 
-  testWidgets('enabled biometric unlock runs automatically when locked', (
+  testWidgets('opening a locked app still offers automatic platform unlock', (
     tester,
   ) async {
     late Directory root;
@@ -386,7 +386,13 @@ void main() {
       final note = await controller.newNote();
       await controller.saveNote(note.id, title: 'Automatic', body: 'unlock');
       expect(await controller.enableBiometricUnlock(), isTrue);
-      controller.lock();
+      // A new process: the app starts locked and may ask on its own.
+      // A lock() in this process must not.
+      controller.dispose();
+      controller = _newController(root, biometricUnlockStore: biometrics);
+      await controller.init();
+      expect(controller.phase, AppPhase.locked);
+      expect(controller.allowsAutomaticBiometricUnlock, isTrue);
     });
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -426,8 +432,10 @@ void main() {
       await controller.init();
       await controller.createVault('passphrase123');
       expect(await controller.enableBiometricUnlock(), isTrue);
+      controller.dispose();
+      controller = _newController(root, biometricUnlockStore: biometrics);
+      await controller.init();
       biometrics.failReads = true;
-      controller.lock();
     });
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -457,6 +465,117 @@ void main() {
       if (await root.exists()) await root.delete(recursive: true);
     });
   });
+
+  testWidgets(
+    'lock button stays locked when the platform cache can return the DEK',
+    (tester) async {
+      late Directory root;
+      late AppController controller;
+      final biometrics = WidgetBiometricUnlockStore();
+      await tester.runAsync(() async {
+        root = await Directory.systemTemp.createTemp('notes_lock_button_test_');
+        controller = _newController(root, biometricUnlockStore: biometrics);
+        await controller.settingsStore.save(
+          const AppSettings(autoLockMinutes: 0),
+        );
+        await controller.init();
+        await controller.createVault('passphrase123');
+        final note = await controller.newNote();
+        await controller.saveNote(note.id, title: 'Visible', body: 'secret');
+        expect(await controller.enableBiometricUnlock(), isTrue);
+      });
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpWidget(NotesApp(controller: controller));
+      await tester.pumpAndSettle();
+      expect(find.text('Visible'), findsWidgets);
+      expect(biometrics.readCount, 0);
+
+      await tester.tap(find.byKey(const Key('lock-button')));
+      await _drain(tester);
+
+      // The cache can return the DEK with no new gesture. The lock must not
+      // take that as an unlock.
+      expect(biometrics.readCount, 0);
+      expect(controller.phase, AppPhase.locked);
+      expect(controller.vault.isUnlocked, isFalse);
+      expect(controller.visibleNotes, isEmpty);
+      expect(find.text('Rune is locked'), findsOneWidget);
+      expect(find.text('Visible'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('biometric-unlock-button')));
+      await _drain(tester);
+
+      expect(biometrics.readCount, 1);
+      expect(controller.phase, AppPhase.unlocked);
+      expect(find.text('Visible'), findsWidgets);
+
+      controller.dispose();
+      await tester.runAsync(() async {
+        if (await root.exists()) await root.delete(recursive: true);
+      });
+    },
+  );
+
+  testWidgets(
+    'background lock stays locked when the platform cache can return the DEK',
+    (tester) async {
+      late Directory root;
+      late AppController controller;
+      final biometrics = WidgetBiometricUnlockStore();
+      await tester.runAsync(() async {
+        root = await Directory.systemTemp.createTemp('notes_background_lock_');
+        controller = _newController(root, biometricUnlockStore: biometrics);
+        await controller.settingsStore.save(
+          const AppSettings(autoLockMinutes: 0),
+        );
+        await controller.init();
+        await controller.createVault('passphrase123');
+        final note = await controller.newNote();
+        await controller.saveNote(note.id, title: 'Visible', body: 'secret');
+        expect(await controller.enableBiometricUnlock(), isTrue);
+        expect(controller.settings.lockOnBackground, isTrue);
+      });
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpWidget(NotesApp(controller: controller));
+      await tester.pumpAndSettle();
+      expect(controller.phase, AppPhase.unlocked);
+      expect(find.text('Visible'), findsWidgets);
+
+      // Notification shade / a system dialog is inactive, not background.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      expect(controller.phase, AppPhase.unlocked);
+      expect(controller.vault.isUnlocked, isTrue);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      await tester.pump();
+      expect(controller.phase, AppPhase.locked);
+      expect(controller.vault.isUnlocked, isFalse);
+      expect(controller.visibleNotes, isEmpty);
+
+      // Coming back is hidden → inactive → resumed. The cache must not reopen
+      // the session on that resume.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      expect(controller.phase, AppPhase.locked);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await _drain(tester);
+
+      expect(biometrics.readCount, 0);
+      expect(controller.phase, AppPhase.locked);
+      expect(controller.vault.isUnlocked, isFalse);
+      expect(find.text('Rune is locked'), findsOneWidget);
+      expect(find.text('Visible'), findsNothing);
+
+      controller.dispose();
+      await tester.runAsync(() async {
+        if (await root.exists()) await root.delete(recursive: true);
+      });
+    },
+  );
 
   testWidgets('Appearance: theme toggle drives the MaterialApp theme mode', (
     tester,
@@ -1721,6 +1840,17 @@ Finder _richTextContaining(String fragment) => find.byWidgetPredicate(
       (widget) =>
           widget is RichText && widget.text.toPlainText().contains(fragment),
     );
+
+/// Lets a post-frame platform-unlock attempt finish, if one was scheduled.
+Future<void> _drain(WidgetTester tester) async {
+  for (var i = 0; i < 40; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 25)),
+    );
+    await tester.pump();
+  }
+  await tester.pumpAndSettle();
+}
 
 /// Sends a Cmd+[key] chord (macOS modifier) and settles the frame.
 Future<void> _sendCmd(WidgetTester tester, LogicalKeyboardKey key) =>
